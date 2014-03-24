@@ -457,12 +457,8 @@ static int str_find_aux(lua_State *L, int find)
   if (start < 0) start = 0;
   st = (MSize)start;
   if (st > s->len) {
-#if LJ_52
     setnilV(L->top-1);
     return 1;
-#else
-    st = s->len;
-#endif
   }
   if (find && ((L->base+3 < L->top && tvistruecond(L->base+3)) ||
 	       !lj_str_haspattern(p))) {  /* Search for fixed string. */
@@ -737,7 +733,7 @@ LUALIB_API int luaopen_string(lua_State *L)
   GCtab *mt;
   global_State *g;
   LJ_LIB_REG(L, LUA_STRLIBNAME, string);
-#if defined(LUA_COMPAT_GFIND) && !LJ_52
+#if defined(LUA_COMPAT_GFIND)
   lua_getfield(L, -1, "gmatch");
   lua_setfield(L, -2, "gfind");
 #endif

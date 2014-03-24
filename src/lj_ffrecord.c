@@ -273,7 +273,6 @@ static void LJ_FASTCALL recff_rawequal(jit_State *J, RecordFFData *rd)
   }  /* else: Interpreter will throw. */
 }
 
-#if LJ_52
 static void LJ_FASTCALL recff_rawlen(jit_State *J, RecordFFData *rd)
 {
   TRef tr = J->base[0];
@@ -284,7 +283,6 @@ static void LJ_FASTCALL recff_rawlen(jit_State *J, RecordFFData *rd)
   /* else: Interpreter will throw. */
   UNUSED(rd);
 }
-#endif
 
 /* Determine mode of select() call. */
 int32_t lj_ffrecord_select_mode(jit_State *J, TRef tr, TValue *tv)
@@ -433,7 +431,7 @@ static void LJ_FASTCALL recff_ipairs_aux(jit_State *J, RecordFFData *rd)
 
 static void LJ_FASTCALL recff_xpairs(jit_State *J, RecordFFData *rd)
 {
-  if (!(LJ_52 && recff_metacall(J, rd, MM_ipairs))) {
+  if (!(recff_metacall(J, rd, MM_ipairs))) {
     TRef tab = J->base[0];
     if (tref_istab(tab)) {
       J->base[0] = lj_ir_kfunc(J, funcV(&J->fn->c.upvalue[0]));
@@ -919,13 +917,8 @@ static void LJ_FASTCALL recff_string_find(jit_State *J, RecordFFData *rd)
     emitir(IRTGI(IR_ULE), trstart, trlen);
   } else {
     emitir(IRTGI(IR_UGT), trstart, trlen);
-#if LJ_52
     J->base[0] = TREF_NIL;
     return;
-#else
-    trstart = trlen;
-    start = str->len;
-#endif
   }
   /* Fixed arg or no pattern matching chars? (Specialized to pattern string.) */
   if ((J->base[2] && tref_istruecond(J->base[3])) ||
@@ -1145,7 +1138,7 @@ static void LJ_FASTCALL recff_io_write(jit_State *J, RecordFFData *rd)
 	emitir(IRTGI(IR_EQ), tr, len);
     }
   }
-  J->base[0] = LJ_52 ? ud : TREF_TRUE;
+  J->base[0] = ud;
 }
 
 static void LJ_FASTCALL recff_io_flush(jit_State *J, RecordFFData *rd)

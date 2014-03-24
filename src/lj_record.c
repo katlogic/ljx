@@ -990,16 +990,10 @@ static TRef rec_mm_len(jit_State *J, TRef tr, TValue *tv)
     TValue *basev = J->L->base + func;
     base[0] = ix.mobj; copyTV(J->L, basev+0, &ix.mobjv);
     base[1] = tr; copyTV(J->L, basev+1, tv);
-#if LJ_52
     base[2] = tr; copyTV(J->L, basev+2, tv);
-#else
-    base[2] = TREF_NIL; setnilV(basev+2);
-#endif
     lj_record_call(J, func, 2);
   } else {
-    if (LJ_52 && tref_istab(tr))
-      return lj_ir_call(J, IRCALL_lj_tab_len, tr);
-    lj_trace_err(J, LJ_TRERR_NOMM);
+    return lj_ir_call(J, IRCALL_lj_tab_len, tr);
   }
   return 0;  /* No result yet. */
 }
@@ -1053,7 +1047,6 @@ static void rec_mm_comp(jit_State *J, RecordIndex *ix, int op)
   copyTV(J->L, &ix->tabv, &ix->valv);
   while (1) {
     MMS mm = (op & 2) ? MM_le : MM_lt;  /* Try __le + __lt or only __lt. */
-#if LJ_52
     if (!lj_record_mm_lookup(J, ix, mm)) {  /* Lookup mm on 1st operand. */
       ix->tab = ix->key;
       copyTV(J->L, &ix->tabv, &ix->keyv);
@@ -1062,31 +1055,6 @@ static void rec_mm_comp(jit_State *J, RecordIndex *ix, int op)
     }
     rec_mm_callcomp(J, ix, op);
     return;
-#else
-    if (lj_record_mm_lookup(J, ix, mm)) {  /* Lookup mm on 1st operand. */
-      cTValue *bv;
-      TRef mo1 = ix->mobj;
-      TValue mo1v;
-      copyTV(J->L, &mo1v, &ix->mobjv);
-      /* Avoid the 2nd lookup and the objcmp if the metatables are equal. */
-      bv = &ix->keyv;
-      if (tvistab(bv) && tabref(tabV(bv)->metatable) == ix->mtv) {
-	TRef mt2 = emitir(IRT(IR_FLOAD, IRT_TAB), ix->key, IRFL_TAB_META);
-	emitir(IRTG(IR_EQ, IRT_TAB), mt2, ix->mt);
-      } else if (tvisudata(bv) && tabref(udataV(bv)->metatable) == ix->mtv) {
-	TRef mt2 = emitir(IRT(IR_FLOAD, IRT_TAB), ix->key, IRFL_UDATA_META);
-	emitir(IRTG(IR_EQ, IRT_TAB), mt2, ix->mt);
-      } else {  /* Lookup metamethod on 2nd operand and compare both. */
-	ix->tab = ix->key;
-	copyTV(J->L, &ix->tabv, bv);
-	if (!lj_record_mm_lookup(J, ix, mm) ||
-	    lj_record_objcmp(J, mo1, ix->mobj, &mo1v, &ix->mobjv))
-	  goto nomatch;
-      }
-      rec_mm_callcomp(J, ix, op);
-      return;
-    }
-#endif
   nomatch:
     /* Lookup failed. Retry with  __lt and swapped operands. */
     if (!(op & 2)) break;  /* Already at __lt. Interpreter will throw. */
@@ -1914,12 +1882,8 @@ void lj_record_ins(jit_State *J)
 	  ta = IRT_NUM;
 	} else if (ta == IRT_NUM && tc == IRT_INT) {
 	  rc = emitir(IRTN(IR_CONV), rc, IRCONV_NUM_INT);
-	} else if (LJ_52) {
+	} else
 	  ta = IRT_NIL;  /* Force metamethod for different types. */
-	} else if (!((ta == IRT_FALSE || ta == IRT_TRUE) &&
-		     (tc == IRT_FALSE || tc == IRT_TRUE))) {
-	  break;  /* Interpreter will throw for two different types. */
-	}
       }
       rec_comp_prep(J);
       irop = (int)op - (int)BC_ISLT + (int)IR_LT;
@@ -1999,8 +1963,6 @@ void lj_record_ins(jit_State *J)
   case BC_LEN:
     if (tref_isstr(rc))
       rc = emitir(IRTI(IR_FLOAD), rc, IRFL_STR_LEN);
-    else if (!LJ_52 && tref_istab(rc))
-      rc = lj_ir_call(J, IRCALL_lj_tab_len, rc);
     else
       rc = rec_mm_len(J, rc, rcv);
     break;
