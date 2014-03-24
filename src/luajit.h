@@ -37,7 +37,6 @@
 #define LUAJIT_URL		"http://luajit.org/"
 
 /* Let it be known who is responsible for this bastardization */
-#define LJX_VERSION_PREFIX "LJX "
 #define LJX_COPYRIGHT	"Copyright (C) 2014 Karel Tuma"
 #define LJX_URL		"http://ljx.lua.cz/"
 
