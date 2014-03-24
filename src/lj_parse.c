@@ -1129,9 +1129,33 @@ static MSize var_lookup_(FuncState *fs, GCstr *name, ExpDesc *e, int first)
   return (MSize)-1;  /* Global. */
 }
 
-/* Lookup variable name. */
-#define var_lookup(ls, e) \
-  var_lookup_((ls)->fs, lex_str(ls), (e), 1)
+/*
+ * _ENV works only with lexical scope (that is, "local _ENV" somewhere).
+ * Weird semantics of global _ENV are ignored; use setfenv for that if you
+ * insist - setmetatable(_G, .. __newindex .. setfenv ..).
+ */
+static void expr_index(FuncState *fs, ExpDesc *t, ExpDesc *e);
+static void var_lookup(LexState *ls, ExpDesc *e)
+{
+  GCstr *name = lex_str(ls);
+  ExpDesc env, key;
+  FuncState *fs = ls->fs;
+
+  /* Exit if found */
+  if (var_lookup_(fs, name, e, 1) != (MSize)-1)
+    return;
+
+  /* No dice. Try in _ENV. */
+  if (var_lookup_(fs, ls->env, &env, 1) == (MSize)-1)
+    return;
+
+  /* Turn it into _ENV.name */
+  *e = env;
+  expr_init(&key, VKSTR, 0);
+  key.u.sval = name;
+  expr_toanyreg(fs, e);
+  expr_index(fs, e, &key);
+}
 
 /* -- Goto an label handling ---------------------------------------------- */
 
