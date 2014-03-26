@@ -26,9 +26,11 @@
 /* Wrapper to simplify _ENV accessors */
 static int getsetenv(lua_State *L)
 {
-  if (lua_gettop(L))
-    return lua_setfenv(L, lua_upvalueindex(1))&0;
-  else
+  if (lua_gettop(L)) {
+    if (!tvistab(L->top-1)) lua_error(L);
+    lua_setfenv(L, lua_upvalueindex(1));
+    return 0;
+  } else
     lua_getfenv(L, lua_upvalueindex(1));
   return 1;
 }
