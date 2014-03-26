@@ -1,0 +1,7 @@
+Selected tests as published by lua.org.
+
+As those are modified from original (mostly removed impl-specific
+debug.* details + known limits in luajit here and there), can't be
+really used to indicate compatibility with Rio Lua.
+
+Mostly useful for finding regressions.
