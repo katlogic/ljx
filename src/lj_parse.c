@@ -433,6 +433,7 @@ static BCPos bcemit_INS(FuncState *fs, BCIns ins)
 
 /* -- Bytecode emitter for expressions ------------------------------------ */
 
+static BCReg expr_toanyreg(FuncState *fs, ExpDesc *e);
 /* Discharge non-constant expression to any register. */
 static void expr_discharge(FuncState *fs, ExpDesc *e)
 {
@@ -463,7 +464,12 @@ static void expr_discharge(FuncState *fs, ExpDesc *e)
     return;
   }
   e->u.s.info = bcemit_INS(fs, ins);
-  e->k = VRELOCABLE;
+  /* Upvalue to _ENV, emit call */
+  if (e->k == VUPVAL && e->u.s.aux == 0) {
+    e->k = VRELOCABLE;
+    bcemit_ABC(fs, BC_CALL, expr_toanyreg(fs, e), 2, 1);
+    e->k = VNONRELOC;
+  } else e->k = VRELOCABLE;
 }
 
 /* Emit bytecode to set a range of registers to nil. */
@@ -624,6 +630,15 @@ static void bcemit_store(FuncState *fs, ExpDesc *var, ExpDesc *e)
   } else if (var->k == VUPVAL) {
     fs->ls->vstack[var->u.s.aux].info |= VSTACK_VAR_RW;
     expr_toval(fs, e);
+    /* process _ENV store as closure call */
+    if (!var->u.s.aux) {
+      fs->freereg++;
+      expr_tonextreg(fs, e);
+      bcemit_AD(fs, BC_UGET, fs->freereg - 2, var->u.s.info);
+      bcemit_ABC(fs, BC_CALL, fs->freereg - 2, 1, 2);
+      fs->freereg -= 2;
+      return;
+    }
     if (e->k <= VKTRUE)
       ins = BCINS_AD(BC_USETP, var->u.s.info, const_pri(e));
     else if (e->k == VKSTR)
@@ -1105,17 +1120,28 @@ static MSize var_lookup_uv(FuncState *fs, MSize vidx, ExpDesc *e)
 static void fscope_uvmark(FuncState *fs, BCReg level);
 
 /* Recursively lookup variables in enclosing functions. */
-static MSize var_lookup_(FuncState *fs, GCstr *name, ExpDesc *e, int first)
+static MSize var_lookup_(FuncState *fs, GCstr *name, ExpDesc *e, int first, int *viaenv)
 {
   if (fs) {
     BCReg reg = var_lookup_local(fs, name);
-    if ((int32_t)reg >= 0) {  /* Local in this function? */
+    if (((int32_t)reg < 0) && /* Found _ENV instead? */
+        ((int32_t)(reg = var_lookup_local(fs, fs->ls->env)) >= 0))
+      *viaenv = name != fs->ls->env; /* Index only if name not '_ENV' itself */
+    if ((int32_t)reg >= 0) { /* Local in this function? */
       expr_init(e, VLOCAL, reg);
       if (!first)
 	fscope_uvmark(fs, reg);  /* Scope now has an upvalue. */
       return (MSize)(e->u.s.aux = (uint32_t)fs->varmap[reg]);
     } else {
-      MSize vidx = var_lookup_(fs->prev, name, e, 0);  /* Var in outer func? */
+      /* Reached top scope looking for _ENV */
+      if (!fs->prev && (name == fs->ls->env)) {
+        *viaenv = 0;
+        fscope_uvmark(fs,0);
+        expr_init(e, VUPVAL, 0);
+        e->u.s.aux = 0;
+        return 0;
+      }
+      MSize vidx = var_lookup_(fs->prev, name, e, 0, viaenv);  /* Var in outer func? */
       if ((int32_t)vidx >= 0) {  /* Yes, make it an upvalue here. */
 	e->u.s.info = (uint8_t)var_lookup_uv(fs, vidx, e);
 	e->k = VUPVAL;
@@ -1129,32 +1155,22 @@ static MSize var_lookup_(FuncState *fs, GCstr *name, ExpDesc *e, int first)
   return (MSize)-1;  /* Global. */
 }
 
-/*
- * _ENV works only with lexical scope (that is, "local _ENV" somewhere).
- * Weird semantics of global _ENV are ignored; use setfenv for that if you
- * insist - setmetatable(_G, .. __newindex .. setfenv ..).
- */
 static void expr_index(FuncState *fs, ExpDesc *t, ExpDesc *e);
 static void var_lookup(LexState *ls, ExpDesc *e)
 {
+  int viaenv = 0;
   GCstr *name = lex_str(ls);
-  ExpDesc env, key;
-  FuncState *fs = ls->fs;
+  ExpDesc key;
 
-  /* Exit if found */
-  if (var_lookup_(fs, name, e, 1) != (MSize)-1)
+  /* Resolve and check for _ENV */
+  if (((int32_t)var_lookup_(ls->fs, name, e, 1, &viaenv) < 0) || !viaenv)
     return;
 
-  /* No dice. Try in _ENV. */
-  if (var_lookup_(fs, ls->env, &env, 1) == (MSize)-1)
-    return;
-
-  /* Turn it into _ENV.name */
-  *e = env;
+  /* Detected scoped _ENV - convert to _ENV.name */
   expr_init(&key, VKSTR, 0);
   key.u.sval = name;
-  expr_toanyreg(fs, e);
-  expr_index(fs, e, &key);
+  expr_toanyreg(ls->fs, e);
+  expr_index(ls->fs, e, &key);
 }
 
 /* -- Goto an label handling ---------------------------------------------- */
@@ -1635,6 +1651,11 @@ static void fs_init(LexState *ls, FuncState *fs)
   fs->flags = 0;
   fs->framesize = 1;  /* Minimum frame size. */
   fs->kt = lj_tab_new(L, 0, 0);
+
+  /* FIXME: This is dumb. Because of string.dump() semantics. */
+  var_new_lit(fs->ls, 0, "_ENV");
+  fs->uvmap[0] = fs->uvtmp[0] = 0; fs->nuv++;
+
   /* Anchor table of constants in stack to avoid being collected. */
   settabV(L, L->top, fs->kt);
   incr_top(L);
