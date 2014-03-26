@@ -1016,7 +1016,7 @@ static void lex_match(LexState *ls, LexToken what, LexToken who, BCLine line)
 static GCstr *lex_str(LexState *ls)
 {
   GCstr *s;
-  if (ls->tok != TK_name && (LJ_52 || ls->tok != TK_goto))
+  if (ls->tok != TK_name)
     err_token(ls, TK_name);
   s = strV(&ls->tokval);
   lj_lex_next(ls);
@@ -1129,9 +1129,33 @@ static MSize var_lookup_(FuncState *fs, GCstr *name, ExpDesc *e, int first)
   return (MSize)-1;  /* Global. */
 }
 
-/* Lookup variable name. */
-#define var_lookup(ls, e) \
-  var_lookup_((ls)->fs, lex_str(ls), (e), 1)
+/*
+ * _ENV works only with lexical scope (that is, "local _ENV" somewhere).
+ * Weird semantics of global _ENV are ignored; use setfenv for that if you
+ * insist - setmetatable(_G, .. __newindex .. setfenv ..).
+ */
+static void expr_index(FuncState *fs, ExpDesc *t, ExpDesc *e);
+static void var_lookup(LexState *ls, ExpDesc *e)
+{
+  GCstr *name = lex_str(ls);
+  ExpDesc env, key;
+  FuncState *fs = ls->fs;
+
+  /* Exit if found */
+  if (var_lookup_(fs, name, e, 1) != (MSize)-1)
+    return;
+
+  /* No dice. Try in _ENV. */
+  if (var_lookup_(fs, ls->env, &env, 1) == (MSize)-1)
+    return;
+
+  /* Turn it into _ENV.name */
+  *e = env;
+  expr_init(&key, VKSTR, 0);
+  key.u.sval = name;
+  expr_toanyreg(fs, e);
+  expr_index(fs, e, &key);
+}
 
 /* -- Goto an label handling ---------------------------------------------- */
 
@@ -1717,7 +1741,7 @@ static void expr_table(LexState *ls, ExpDesc *e)
       if (!expr_isk(&key)) expr_index(fs, e, &key);
       if (expr_isnumk(&key) && expr_numiszero(&key)) needarr = 1; else nhash++;
       lex_check(ls, '=');
-    } else if ((ls->tok == TK_name || (!LJ_52 && ls->tok == TK_goto)) &&
+    } else if ((ls->tok == TK_name) &&
 	       lj_lex_lookahead(ls) == '=') {
       expr_str(ls, &key);
       lex_check(ls, '=');
@@ -1812,7 +1836,7 @@ static BCReg parse_params(LexState *ls, int needself)
     var_new_lit(ls, nparams++, "self");
   if (ls->tok != ')') {
     do {
-      if (ls->tok == TK_name || (!LJ_52 && ls->tok == TK_goto)) {
+      if (ls->tok == TK_name) {
 	var_new(ls, nparams++, lex_str(ls));
       } else if (ls->tok == TK_dots) {
 	lj_lex_next(ls);
@@ -1888,10 +1912,6 @@ static void parse_args(LexState *ls, ExpDesc *e)
   BCReg base;
   BCLine line = ls->linenumber;
   if (ls->tok == '(') {
-#if !LJ_52
-    if (line != ls->lastline)
-      err_syntax(ls, LJ_ERR_XAMBIG);
-#endif
     lj_lex_next(ls);
     if (ls->tok == ')') {  /* f(). */
       args.k = VVOID;
@@ -1937,7 +1957,7 @@ static void expr_primary(LexState *ls, ExpDesc *v)
     expr(ls, v);
     lex_match(ls, ')', '(', line);
     expr_discharge(ls->fs, v);
-  } else if (ls->tok == TK_name || (!LJ_52 && ls->tok == TK_goto)) {
+  } else if (ls->tok == TK_name) {
     var_lookup(ls, v);
   } else {
     err_syntax(ls, LJ_ERR_XSYMBOL);
@@ -2375,7 +2395,7 @@ static void parse_label(LexState *ls)
       synlevel_begin(ls);
       parse_label(ls);
       synlevel_end(ls);
-    } else if (LJ_52 && ls->tok == ';') {
+    } else if (ls->tok == ';') {
       lj_lex_next(ls);
     } else {
       break;
@@ -2648,17 +2668,15 @@ static int parse_stmt(LexState *ls)
   case TK_break:
     lj_lex_next(ls);
     parse_break(ls);
-    return !LJ_52;  /* Must be last in Lua 5.1. */
-#if LJ_52
+    return 0;
   case ';':
     lj_lex_next(ls);
     break;
-#endif
   case TK_label:
     parse_label(ls);
     break;
   case TK_goto:
-    if (LJ_52 || lj_lex_lookahead(ls) == TK_name) {
+    if (lj_lex_lookahead(ls) == TK_name) {
       lj_lex_next(ls);
       parse_goto(ls);
       break;

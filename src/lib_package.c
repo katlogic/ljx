@@ -443,6 +443,7 @@ static int lj_cf_package_require(lua_State *L)
 
 /* ------------------------------------------------------------------------ */
 
+#if LJ_51
 static void setfenv(lua_State *L)
 {
   lua_Debug ar;
@@ -519,6 +520,7 @@ static int lj_cf_package_seeall(lua_State *L)
   lua_setfield(L, -2, "__index");  /* mt.__index = _G */
   return 0;
 }
+#endif
 
 /* ------------------------------------------------------------------------ */
 
@@ -548,12 +550,16 @@ static void setpath(lua_State *L, const char *fieldname, const char *envname,
 static const luaL_Reg package_lib[] = {
   { "loadlib",	lj_cf_package_loadlib },
   { "searchpath",  lj_cf_package_searchpath },
+#if LJ_51
   { "seeall",	lj_cf_package_seeall },
+#endif
   { NULL, NULL }
 };
 
 static const luaL_Reg package_global[] = {
+#if LJ_51
   { "module",	lj_cf_package_module },
+#endif
   { "require",	lj_cf_package_require },
   { NULL, NULL }
 };

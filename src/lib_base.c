@@ -80,12 +80,11 @@ LJLIB_ASM(next)
   return FFH_UNREACHABLE;
 }
 
-#if LJ_52 || LJ_HASFFI
 static int ffh_pairs(lua_State *L, MMS mm)
 {
   TValue *o = lj_lib_checkany(L, 1);
   cTValue *mo = lj_meta_lookup(L, o, mm);
-  if ((LJ_52 || tviscdata(o)) && !tvisnil(mo)) {
+  if (!tvisnil(mo)) {
     L->top = o+1;  /* Only keep one argument. */
     copyTV(L, L->base-1, mo);  /* Replace callable. */
     return FFH_TAILCALL;
@@ -96,9 +95,6 @@ static int ffh_pairs(lua_State *L, MMS mm)
     return FFH_RES(3);
   }
 }
-#else
-#define ffh_pairs(L, mm)	(lj_lib_checktab(L, 1), FFH_UNREACHABLE)
-#endif
 
 LJLIB_PUSH(lastcl)
 LJLIB_ASM(pairs)		LJLIB_REC(xpairs 0)
@@ -200,7 +196,6 @@ LJLIB_CF(rawequal)		LJLIB_REC(.)
   return 1;
 }
 
-#if LJ_52
 LJLIB_CF(rawlen)		LJLIB_REC(.)
 {
   cTValue *o = L->base;
@@ -212,7 +207,6 @@ LJLIB_CF(rawlen)		LJLIB_REC(.)
   setintV(L->top-1, len);
   return 1;
 }
-#endif
 
 LJLIB_CF(unpack)
 {
@@ -544,15 +538,9 @@ LJLIB_CF(coroutine_status)
 
 LJLIB_CF(coroutine_running)
 {
-#if LJ_52
   int ismain = lua_pushthread(L);
   setboolV(L->top++, ismain);
   return 2;
-#else
-  if (lua_pushthread(L))
-    setnilV(L->top++);
-  return 1;
-#endif
 }
 
 LJLIB_CF(coroutine_create)

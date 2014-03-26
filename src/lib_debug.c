@@ -43,9 +43,6 @@ LJLIB_CF(debug_setmetatable)
   lj_lib_checktabornil(L, 2);
   L->top = L->base+2;
   lua_setmetatable(L, 1);
-#if !LJ_52
-  setboolV(L->top-1, 1);
-#endif
   return 1;
 }
 
@@ -256,7 +253,6 @@ LJLIB_CF(debug_upvaluejoin)
   return 0;
 }
 
-#if LJ_52
 LJLIB_CF(debug_getuservalue)
 {
   TValue *o = L->base;
@@ -279,7 +275,6 @@ LJLIB_CF(debug_setuservalue)
   lua_setfenv(L, 1);
   return 1;
 }
-#endif
 
 /* ------------------------------------------------------------------------ */
 

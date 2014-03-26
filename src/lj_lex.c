@@ -377,6 +377,7 @@ int lj_lex_setup(lua_State *L, LexState *ls)
   ls->sizebcstack = 0;
   ls->lookahead = TK_eof;  /* No look-ahead token. */
   ls->linenumber = 1;
+  ls->env = lj_str_newz(L, "_ENV");
   ls->lastline = 1;
   lex_next(ls);  /* Read-ahead first char. */
   if (ls->c == 0xef && ls->p + 2 <= ls->pe && (uint8_t)ls->p[0] == 0xbb &&
@@ -477,5 +478,7 @@ void lj_lex_init(lua_State *L)
     fixstring(s);  /* Reserved words are never collected. */
     s->reserved = (uint8_t)(i+1);
   }
+  /* Anchor here; lj_lex_setup picks it up later */
+  fixstring(lj_str_newz(L, "_ENV"));
 }
 

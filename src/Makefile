@@ -159,6 +159,8 @@ XCFLAGS=
 # Cross-compilation examples:
 #   make HOST_CC="gcc -m32" CROSS=i586-mingw32msvc- TARGET_SYS=Windows
 #   make HOST_CC="gcc -m32" CROSS=powerpc-linux-gnu-
+LJX_VERSION:=$(shell git describe || cat .version)
+XCFLAGS=-DLJX_VERSION=\"$(LJX_VERSION)\"
 
 CCOPTIONS= $(CCDEBUG) $(CCOPT) $(CCWARN) $(XCFLAGS) $(CFLAGS)
 LDOPTIONS= $(CCDEBUG) $(LDFLAGS)

@@ -448,13 +448,7 @@ enum {
 #define MMDEF_FFI(_)
 #endif
 
-#if LJ_52 || LJ_HASFFI
 #define MMDEF_PAIRS(_) _(pairs) _(ipairs)
-#else
-#define MMDEF_PAIRS(_)
-#define MM_pairs	255
-#define MM_ipairs	255
-#endif
 
 #define MMDEF(_) \
   _(index) _(newindex) _(gc) _(mode) _(eq) _(len) \

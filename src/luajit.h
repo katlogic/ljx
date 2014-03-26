@@ -36,6 +36,11 @@
 #define LUAJIT_COPYRIGHT	"Copyright (C) 2005-2014 Mike Pall"
 #define LUAJIT_URL		"http://luajit.org/"
 
+/* Let it be known who is responsible for this bastardization */
+#define LJX_COPYRIGHT	"Copyright (C) 2014 Karel Tuma"
+#define LJX_URL		"http://ljx.lua.cz/"
+
+
 /* Modes for luaJIT_setmode. */
 #define LUAJIT_MODE_MASK	0x00ff
 

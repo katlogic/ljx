@@ -880,24 +880,17 @@ static void build_subroutines(BuildCtx *ctx)
   |
   |->vmeta_len:
   |  // CARG2 already set by BC_LEN.
-#if LJ_52
   |  move MULTRES, CARG1
-#endif
   |  load_got lj_meta_len
   |   sw BASE, L->base
   |   sw PC, SAVE_PC
   |  call_intern lj_meta_len		// (lua_State *L, TValue *o)
   |.  move CARG1, L
   |  // Returns NULL (retry) or TValue * (metamethod base).
-#if LJ_52
   |  bnez CRET1, ->vmeta_binop		// Binop call for compatibility.
   |.  nop
   |  b ->BC_LEN_Z
   |.  move CARG1, MULTRES
-#else
-  |  b ->vmeta_binop			// Binop call for compatibility.
-  |.  nop
-#endif
   |
   |//-- Call metamethod ----------------------------------------------------
   |
@@ -1197,13 +1190,9 @@ static void build_subroutines(BuildCtx *ctx)
   |  li AT, LJ_TTAB
   |  bne CARG3, AT, ->fff_fallback
   |.  lw PC, FRAME_PC(BASE)
-#if LJ_52
   |  lw TAB:TMP2, TAB:CARG1->metatable
   |   ldc1 f0, CFUNC:RB->upvalue[0]
   |  bnez TAB:TMP2, ->fff_fallback
-#else
-  |  ldc1 f0, CFUNC:RB->upvalue[0]
-#endif
   |.  addiu RA, BASE, -8
   |   sw TISNIL, 8+HI(BASE)
   |  li RD, (3+1)*8
@@ -1263,13 +1252,9 @@ static void build_subroutines(BuildCtx *ctx)
   |  li AT, LJ_TTAB
   |  bne CARG3, AT, ->fff_fallback
   |.  lw PC, FRAME_PC(BASE)
-#if LJ_52
   |  lw TAB:TMP2, TAB:CARG1->metatable
   |   ldc1 f0, CFUNC:RB->upvalue[0]
   |  bnez TAB:TMP2, ->fff_fallback
-#else
-  |  ldc1 f0, CFUNC:RB->upvalue[0]
-#endif
   |.  addiu RA, BASE, -8
   |   sw r0, 8+HI(BASE)
   |   sw r0, 8+LO(BASE)
@@ -2684,12 +2669,10 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |2:
     |  bne TMP0, AT, ->vmeta_len
     |.  nop
-#if LJ_52
     |  lw TAB:TMP2, TAB:CARG1->metatable
     |  bnez TAB:TMP2, >9
     |.  nop
     |3:
-#endif
     |->BC_LEN_Z:
     |  load_got lj_tab_len
     |  call_intern lj_tab_len		// (GCtab *t)
@@ -2697,7 +2680,6 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  // Returns uint32_t (but less than 2^31).
     |  b <1
     |.  nop
-#if LJ_52
     |9:
     |  lbu TMP0, TAB:TMP2->nomm
     |  andi TMP0, TMP0, 1<<MM_len
@@ -2705,7 +2687,6 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |.  nop
     |  b ->vmeta_len
     |.  nop
-#endif
     break;
 
   /* -- Binary ops -------------------------------------------------------- */
