@@ -194,7 +194,8 @@
   _(IFUNCV,	rbase,	___,	___,	___) \
   _(JFUNCV,	rbase,	___,	lit,	___) \
   _(FUNCC,	rbase,	___,	___,	___) \
-  _(FUNCCW,	rbase,	___,	___,	___)
+  _(FUNCCW,	rbase,	___,	___,	___) \
+  _(ESETV,	uv,	___,	var,	___) \
 
 /* Bytecode opcode numbers. */
 typedef enum {

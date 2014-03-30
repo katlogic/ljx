@@ -23,18 +23,6 @@
 #include "lj_bcdump.h"
 #include "lj_parse.h"
 
-/* Wrapper to simplify _ENV accessors */
-static int getsetenv(lua_State *L)
-{
-  if (lua_gettop(L)) {
-    if (!tvistab(L->top-1)) lua_error(L);
-    lua_setfenv(L, lua_upvalueindex(1));
-    return 0;
-  } else
-    lua_getfenv(L, lua_upvalueindex(1));
-  return 1;
-}
-
 /* -- Load Lua source code and bytecode ----------------------------------- */
 
 static TValue *cpparser(lua_State *L, lua_CFunction dummy, void *ud)
@@ -54,11 +42,6 @@ static TValue *cpparser(lua_State *L, lua_CFunction dummy, void *ud)
   fn = lj_func_newL_empty(L, pt, tabref(L->env));
   /* Don't combine above/below into one statement. */
   setfuncV(L, L->top++, fn);
-  /* Construct _ENV closure getter/setter */
-  eclo = lj_func_newC(L, 1, tabref(L->env));
-  eclo->c.f = &getsetenv;
-  setfuncV(L, &eclo->c.upvalue[0], fn);
-  setfuncV(L, uvval(&gcref(fn->l.uvptr[0])->uv), eclo);
   return NULL;
 }
 
