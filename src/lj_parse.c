@@ -464,12 +464,7 @@ static void expr_discharge(FuncState *fs, ExpDesc *e)
     return;
   }
   e->u.s.info = bcemit_INS(fs, ins);
-  /* Upvalue to _ENV, emit call */
-  if (e->k == VUPVAL && e->u.s.aux == 0) {
-    e->k = VRELOCABLE;
-    bcemit_ABC(fs, BC_CALL, expr_toanyreg(fs, e), 2, 1);
-    e->k = VNONRELOC;
-  } else e->k = VRELOCABLE;
+  e->k = VRELOCABLE;
 }
 
 /* Emit bytecode to set a range of registers to nil. */
@@ -630,16 +625,10 @@ static void bcemit_store(FuncState *fs, ExpDesc *var, ExpDesc *e)
   } else if (var->k == VUPVAL) {
     fs->ls->vstack[var->u.s.aux].info |= VSTACK_VAR_RW;
     expr_toval(fs, e);
-    /* process _ENV store as closure call */
-    if (!var->u.s.aux) {
-      fs->freereg++;
-      expr_tonextreg(fs, e);
-      bcemit_AD(fs, BC_UGET, fs->freereg - 2, var->u.s.info);
-      bcemit_ABC(fs, BC_CALL, fs->freereg - 2, 1, 2);
-      fs->freereg -= 2;
-      return;
-    }
-    if (e->k <= VKTRUE)
+    /* setting _ENV is special opcode */
+    if (gco2str(gcref(fs->ls->vstack[var->u.s.aux].name)) == fs->ls->env)
+      ins = BCINS_AD(BC_ESETV, var->u.s.info, expr_toanyreg(fs, e));
+    else if (e->k <= VKTRUE)
       ins = BCINS_AD(BC_USETP, var->u.s.info, const_pri(e));
     else if (e->k == VKSTR)
       ins = BCINS_AD(BC_USETS, var->u.s.info, const_str(fs, e));
@@ -1116,46 +1105,50 @@ static MSize var_lookup_uv(FuncState *fs, MSize vidx, ExpDesc *e)
   return n;
 }
 
-/* Forward declaration. */
 static void fscope_uvmark(FuncState *fs, BCReg level);
+static void expr_index(FuncState *fs, ExpDesc *t, ExpDesc *e);
 
-/* Recursively lookup variables in enclosing functions. */
-static MSize var_lookup_(FuncState *fs, GCstr *name, ExpDesc *e, int first, int *viaenv)
+/* Recursively look for variables in enclosing functions. */
+static MSize var_lookup_aux(FuncState *fs, GCstr *name, ExpDesc *e, int first, int *viaenv)
 {
-  if (fs) {
-    BCReg reg = var_lookup_local(fs, name);
-    if (((int32_t)reg < 0) && /* Found _ENV instead? */
-        ((int32_t)(reg = var_lookup_local(fs, fs->ls->env)) >= 0))
-      *viaenv = name != fs->ls->env; /* Index only if name not '_ENV' itself */
-    if ((int32_t)reg >= 0) { /* Local in this function? */
-      expr_init(e, VLOCAL, reg);
-      if (!first)
-	fscope_uvmark(fs, reg);  /* Scope now has an upvalue. */
-      return (MSize)(e->u.s.aux = (uint32_t)fs->varmap[reg]);
-    } else {
-      /* Reached top scope looking for _ENV */
-      if (!fs->prev && (name == fs->ls->env)) {
-        *viaenv = 0;
-        fscope_uvmark(fs,0);
-        expr_init(e, VUPVAL, 0);
-        e->u.s.aux = 0;
-        return 0;
-      }
-      MSize vidx = var_lookup_(fs->prev, name, e, 0, viaenv);  /* Var in outer func? */
-      if ((int32_t)vidx >= 0) {  /* Yes, make it an upvalue here. */
-	e->u.s.info = (uint8_t)var_lookup_uv(fs, vidx, e);
-	e->k = VUPVAL;
-	return vidx;
-      }
-    }
-  } else {  /* Not found in any function, must be a global. */
-    expr_init(e, VGLOBAL, 0);
-    e->u.sval = name;
+  BCReg reg;
+  MSize vidx;
+
+  if (!fs) return (MSize)-1;  /* Not found. */
+
+  /* Check local scope */
+  reg = var_lookup_local(fs, name);
+  if (((int32_t)reg < 0) && /* Found _ENV instead? */
+      ((int32_t)(reg = var_lookup_local(fs, fs->ls->env)) >= 0))
+    *viaenv = name != fs->ls->env; /* Index only if name not '_ENV' itself */
+
+  /* Local in this function? */
+  if ((int32_t)reg >= 0) {
+    expr_init(e, VLOCAL, reg);
+    if (!first)
+      fscope_uvmark(fs, reg);  /* Scope now has an upvalue. */
+    return (MSize)(e->u.s.aux = (uint32_t)fs->varmap[reg]);
   }
-  return (MSize)-1;  /* Global. */
+
+  /* Reached top scope looking for _ENV, explicit upvalue. */
+  if (!fs->prev && (name == fs->ls->env)) {
+    *viaenv = 0;
+    fscope_uvmark(fs,0);
+    expr_init(e, VUPVAL, 0);
+    e->u.s.aux = 0;
+    return 0;
+  }
+
+  /* Not found, recurse to upper scope. */
+  vidx = var_lookup_aux(fs->prev, name, e, 0, viaenv);
+  if ((int32_t)vidx >= 0) {  /* Yes, make it an upvalue there. */
+    e->u.s.info = (uint8_t)var_lookup_uv(fs, vidx, e);
+    e->k = VUPVAL;
+  }
+  return vidx;
 }
 
-static void expr_index(FuncState *fs, ExpDesc *t, ExpDesc *e);
+/* Look up variable with _ENV scoping. */
 static void var_lookup(LexState *ls, ExpDesc *e)
 {
   int viaenv = 0;
@@ -1163,10 +1156,21 @@ static void var_lookup(LexState *ls, ExpDesc *e)
   ExpDesc key;
 
   /* Resolve and check for _ENV */
-  if (((int32_t)var_lookup_(ls->fs, name, e, 1, &viaenv) < 0) || !viaenv)
+  if (((int32_t)var_lookup_aux(ls->fs, name, e, 1, &viaenv) < 0)) { /* Not found */
+    /* If not found (local or uv) and no parent _ENV is present either,
+     * the var will become global. */
+    expr_init(e, VGLOBAL, 0);
+    e->u.sval = name;
+    /* But that still needs _ENV at slot 0 to keep envs in sync,
+     * so perform a dummy lookup to introduce it. */
+    var_lookup_aux(ls->fs, ls->env, &key, 1, &viaenv);
     return;
+  }
 
-  /* Detected scoped _ENV - convert to _ENV.name */
+  /* Not via parent 'local _ENV' means direct upvalue */
+  if (!viaenv) return;
+
+  /* Scoped local _ENV, transform to _ENV.name */
   expr_init(&key, VKSTR, 0);
   key.u.sval = name;
   expr_toanyreg(ls->fs, e);
@@ -1651,10 +1655,6 @@ static void fs_init(LexState *ls, FuncState *fs)
   fs->flags = 0;
   fs->framesize = 1;  /* Minimum frame size. */
   fs->kt = lj_tab_new(L, 0, 0);
-
-  /* FIXME: This is dumb. Because of string.dump() semantics. */
-  var_new_lit(fs->ls, 0, "_ENV");
-  fs->uvmap[0] = fs->uvtmp[0] = 0; fs->nuv++;
 
   /* Anchor table of constants in stack to avoid being collected. */
   settabV(L, L->top, fs->kt);
@@ -2745,17 +2745,26 @@ GCproto *lj_parse(LexState *ls)
   fs.bcbase = NULL;
   fs.bclim = 0;
   fs.flags |= PROTO_VARARG;  /* Main chunk is always a vararg func. */
+  ls->env = lj_parse_keepstr(ls, "_ENV", 4);
+  var_new(ls, 0, ls->env);
+  ls->vstack[0].startpc = fs.pc;
+  ls->vstack[0].slot = 0;
+  ls->vstack[0].info = 0;
+  fs.uvmap[0] = 0;
+  fs.uvtmp[0] = LJ_MAX_VSTACK;
+  fs.nuv++;
   fscope_begin(&fs, &bl, 0);
   bcemit_AD(&fs, BC_FUNCV, 0, 0);  /* Placeholder. */
   lj_lex_next(ls);  /* Read-ahead first token. */
   parse_chunk(ls);
   if (ls->tok != TK_eof)
     err_token(ls, TK_eof);
+  ls->vstack[0].endpc = fs.pc;
   pt = fs_finish(ls, ls->linenumber);
   L->top--;  /* Drop chunkname. */
   lua_assert(fs.prev == NULL);
   lua_assert(ls->fs == NULL);
-  lua_assert(pt->sizeuv == 0);
+  lua_assert(pt->sizeuv == 1);
   return pt;
 }
 
