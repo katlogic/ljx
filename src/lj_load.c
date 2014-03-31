@@ -29,7 +29,7 @@ static TValue *cpparser(lua_State *L, lua_CFunction dummy, void *ud)
 {
   LexState *ls = (LexState *)ud;
   GCproto *pt;
-  GCfunc *fn, *eclo;
+  GCfunc *fn;
   int bc;
   UNUSED(dummy);
   cframe_errfunc(L->cframe) = -1;  /* Inherit error function. */

@@ -1365,11 +1365,14 @@ static void fs_fixup_uv2(FuncState *fs, GCproto *pt)
   for (i = 0; i < n; i++) {
     VarIndex vidx = uv[i];
     if (vidx >= LJ_MAX_VSTACK)
-      uv[i] = vidx - LJ_MAX_VSTACK;
+      uv[i] = (vidx -= LJ_MAX_VSTACK);
     else if ((vstack[vidx].info & VSTACK_VAR_RW))
       uv[i] = vstack[vidx].slot | PROTO_UV_LOCAL;
     else
       uv[i] = vstack[vidx].slot | PROTO_UV_LOCAL | PROTO_UV_IMMUTABLE;
+    /* Mark where _ENV lives */
+    if (gco2str(gcref(vstack[vidx].name)) == fs->ls->env)
+      uv[i] |= PROTO_UV_ENV;
   }
 }
 

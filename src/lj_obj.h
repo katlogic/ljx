@@ -324,8 +324,17 @@ typedef struct GCproto {
 #define PROTO_CLC_BITS		3
 #define PROTO_CLC_POLY		(3*PROTO_CLCOUNT)  /* Polymorphic threshold. */
 
+/* UV flags in bytecode/proto */
 #define PROTO_UV_LOCAL		0x8000	/* Upvalue for local slot. */
 #define PROTO_UV_IMMUTABLE	0x4000	/* Immutable upvalue. */
+#define PROTO_UV_ENV            0x2000	/* Refers to _ENV. */
+#define PROTO_UV_MASK           0x1fff
+#define PROTO_UV_SHIFT          13
+
+/* For uv->flags */
+#define UV_LOCAL      (PROTO_UV_LOCAL>>PROTO_UV_SHIFT)
+#define UV_IMMUTABLE  (PROTO_UV_IMMUTABLE>>PROTO_UV_SHIFT)
+#define UV_ENV        (PROTO_UV_LOCAL>>PROTO_UV_SHIFT)
 
 #define proto_kgc(pt, idx) \
   check_exp((uintptr_t)(intptr_t)(idx) >= (uintptr_t)-(intptr_t)(pt)->sizekgc, \
@@ -347,7 +356,7 @@ typedef struct GCproto {
 typedef struct GCupval {
   GCHeader;
   uint8_t closed;	/* Set if closed (i.e. uv->v == &uv->u.value). */
-  uint8_t immutable;	/* Immutable value. */
+  uint8_t flags;	/* Immutable value. */
   union {
     TValue tv;		/* If closed: the value itself. */
     struct {		/* If open: double linked list, anchored at thread. */
@@ -378,6 +387,7 @@ typedef struct GCfuncC {
 
 typedef struct GCfuncL {
   GCfuncHeader;
+  GCRef next_ENV, prev_ENV; /* Chain of closures we share _ENV with */
   GCRef uvptr[1];	/* Array of _pointers_ to upvalue objects (GCupval). */
 } GCfuncL;
 

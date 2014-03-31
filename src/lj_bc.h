@@ -129,8 +129,8 @@
   _(KNIL,	base,	___,	base,	___) \
   \
   /* Upvalue and function ops. */ \
+  _(JMP,	rbase,	___,	jump,	___) \
   _(UGET,	dst,	___,	uv,	___) \
-  _(USETV,	uv,	___,	var,	___) \
   _(USETS,	uv,	___,	str,	___) \
   _(USETN,	uv,	___,	num,	___) \
   _(USETP,	uv,	___,	pri,	___) \
@@ -184,7 +184,8 @@
   _(ILOOP,	rbase,	___,	jump,	___) \
   _(JLOOP,	rbase,	___,	lit,	___) \
   \
-  _(JMP,	rbase,	___,	jump,	___) \
+  _(ESETV,	uv,	___,	var,	___) \
+  _(USETV,	uv,	___,	var,	___) \
   \
   /* Function headers. I/J = interp/JIT, F/V/C = fixarg/vararg/C func. */ \
   _(FUNCF,	rbase,	___,	___,	___) \
@@ -195,7 +196,6 @@
   _(JFUNCV,	rbase,	___,	lit,	___) \
   _(FUNCC,	rbase,	___,	___,	___) \
   _(FUNCCW,	rbase,	___,	___,	___) \
-  _(ESETV,	uv,	___,	var,	___) \
 
 /* Bytecode opcode numbers. */
 typedef enum {
