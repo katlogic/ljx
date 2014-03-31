@@ -342,6 +342,8 @@ static int load_aux(lua_State *L, int status, int envarg)
       GCtab *t = tabV(L->base+envarg-1);
       setgcref(fn->c.env, obj2gco(t));
       lj_gc_objbarrier(L, fn, t);
+      lua_pushvalue(L, envarg);
+      lua_setupvalue(L, -2, 1);
     }
     return 1;
   } else {

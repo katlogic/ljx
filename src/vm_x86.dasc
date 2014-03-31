@@ -281,7 +281,7 @@
 |.endmacro
 |
 |.macro ins_refetch
-|  mov RC, [PC]
+|  mov RC, [PC-4]
 |  movzx RA, RCH
 |  shr RC, 16
 |.endmacro

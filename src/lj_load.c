@@ -40,6 +40,7 @@ static TValue *cpparser(lua_State *L, lua_CFunction dummy, void *ud)
   }
   pt = bc ? lj_bcread(ls) : lj_parse(ls);
   fn = lj_func_newL_empty(L, pt, tabref(L->env));
+  settabV(L, uvval(&gcref(fn->l.uvptr[0])->uv), tabref(L->env));
   /* Don't combine above/below into one statement. */
   setfuncV(L, L->top++, fn);
   return NULL;
