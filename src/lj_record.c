@@ -1359,7 +1359,7 @@ static void rec_tsetm(jit_State *J, BCReg ra, BCReg rn, int32_t i)
 /* Check whether upvalue is immutable and ok to constify. */
 static int rec_upvalue_constify(jit_State *J, GCupval *uvp)
 {
-  if (uvp->immutable) {
+  if (uvp->flags & UV_IMMUTABLE) {
     cTValue *o = uvval(uvp);
     /* Don't constify objects that may retain large amounts of memory. */
 #if LJ_HASFFI

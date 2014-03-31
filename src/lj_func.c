@@ -120,6 +120,9 @@ static GCfunc *func_newL(lua_State *L, GCproto *pt, GCtab *env)
 {
   uint32_t count;
   GCfunc *fn = (GCfunc *)lj_mem_newgco(L, sizeLfunc((MSize)pt->sizeuv));
+  /* Initially points to itself */
+  setgcref(fn->l.prev_ENV, obj2gco(fn));
+  setgcref(fn->l.next_ENV, obj2gco(fn));
   fn->l.gct = ~LJ_TFUNC;
   fn->l.ffid = FF_LUA;
   fn->l.nupvalues = 0;  /* Set to zero until upvalues are initialized. */
@@ -165,10 +168,17 @@ GCfunc *lj_func_newL_gc(lua_State *L, GCproto *pt, GCfuncL *parent)
     GCupval *uv;
     if ((v & PROTO_UV_LOCAL)) {
       uv = func_finduv(L, base + (v & 0xff));
-      uv->immutable = ((v / PROTO_UV_IMMUTABLE) & 1);
+      uv->flags = v >> PROTO_UV_SHIFT;
       uv->dhash = (uint32_t)(uintptr_t)mref(parent->pc, char) ^ (v << 24);
     } else {
-      uv = &gcref(puv[v])->uv;
+      uv = &gcref(puv[v & PROTO_UV_MASK])->uv;
+      /* Inherited env - link it in same group */
+      if (v & PROTO_UV_ENV) {
+        setgcref(fn->l.next_ENV, obj2gco(parent));
+        fn->l.prev_ENV = parent->prev_ENV;
+        setgcref(gcref(fn->l.prev_ENV)->fn.l.next_ENV, obj2gco(fn));
+        setgcref(parent->prev_ENV, obj2gco(fn));
+      }
     }
     setgcref(fn->l.uvptr[i], obj2gco(uv));
   }
@@ -180,6 +190,10 @@ void LJ_FASTCALL lj_func_free(global_State *g, GCfunc *fn)
 {
   MSize size = isluafunc(fn) ? sizeLfunc((MSize)fn->l.nupvalues) :
 			       sizeCfunc((MSize)fn->c.nupvalues);
+  if (isluafunc(fn)) {
+    setgcrefr(gcref(fn->l.next_ENV)->fn.l.prev_ENV, fn->l.prev_ENV);
+    setgcrefr(gcref(fn->l.prev_ENV)->fn.l.next_ENV, fn->l.next_ENV);
+  }
   lj_mem_free(g, fn, size);
 }
 

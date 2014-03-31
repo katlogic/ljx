@@ -280,6 +280,12 @@
 |.endif
 |.endmacro
 |
+|.macro ins_refetch
+|  mov RC, [PC]
+|  movzx RA, RCH
+|  shr RC, 16
+|.endmacro
+|
 |// Instruction footer.
 |.if 1
 |  // Replicated dispatch. Less unpredictable branches, but higher I-Cache use.
@@ -4215,6 +4221,19 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  ins_next
     break;
   case BC_ESETV:
+    |  ins_AD
+    |  checktp RD, LJ_TTAB
+    |  mov RD, [BASE+RD*8] // val to assign
+    |  mov LFUNC:RB, [BASE-8] // lfunc
+    |  jne >2 // silently skip if not table
+    |1:
+    |  mov LFUNC:RB->env, RD // set env
+    |  mov LFUNC:RB, LFUNC:RB->next_ENV
+    |  cmp LFUNC:RB, [BASE-8] // set for all members sharing this _ENV uv
+    |  jnz <1
+    |2:
+    |  ins_refetch
+    break;
   case BC_USETV:
 #define TV2MARKOFS \
  ((int32_t)offsetof(GCupval, marked)-(int32_t)offsetof(GCupval, tv))
