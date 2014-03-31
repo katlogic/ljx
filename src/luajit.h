@@ -38,7 +38,7 @@
 
 /* Let it be known who is responsible for this bastardization */
 #define LJX_COPYRIGHT	"Copyright (C) 2014 Karel Tuma"
-#define LJX_URL		"http://ljx.lua.cz/"
+#define LJX_URL		"http://lua.cz/"
 
 
 /* Modes for luaJIT_setmode. */
