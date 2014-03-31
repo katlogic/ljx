@@ -626,7 +626,8 @@ static void bcemit_store(FuncState *fs, ExpDesc *var, ExpDesc *e)
     fs->ls->vstack[var->u.s.aux].info |= VSTACK_VAR_RW;
     expr_toval(fs, e);
     /* setting _ENV is special opcode */
-    if (gco2str(gcref(fs->ls->vstack[var->u.s.aux].name)) == fs->ls->env)
+    if (!var->u.s.aux)
+      //gco2str(gcref(fs->ls->vstack[var->u.s.aux].name)) == fs->ls->env)
       ins = BCINS_AD(BC_ESETV, var->u.s.info, expr_toanyreg(fs, e));
     else if (e->k <= VKTRUE)
       ins = BCINS_AD(BC_USETP, var->u.s.info, const_pri(e));
@@ -1371,7 +1372,7 @@ static void fs_fixup_uv2(FuncState *fs, GCproto *pt)
     else
       uv[i] = vstack[vidx].slot | PROTO_UV_LOCAL | PROTO_UV_IMMUTABLE;
     /* Mark where _ENV lives */
-    if (gco2str(gcref(vstack[vidx].name)) == fs->ls->env)
+    if (!vidx)
       uv[i] |= PROTO_UV_ENV;
   }
 }
@@ -2750,7 +2751,8 @@ GCproto *lj_parse(LexState *ls)
   fs.flags |= PROTO_VARARG;  /* Main chunk is always a vararg func. */
   ls->env = lj_parse_keepstr(ls, "_ENV", 4);
   var_new(ls, 0, ls->env);
-  ls->vstack[0].startpc = fs.pc;
+  ls->vstack[0].startpc = 0;
+  ls->vstack[0].endpc = 0;
   ls->vstack[0].slot = 0;
   ls->vstack[0].info = 0;
   fs.uvmap[0] = 0;
@@ -2762,7 +2764,6 @@ GCproto *lj_parse(LexState *ls)
   parse_chunk(ls);
   if (ls->tok != TK_eof)
     err_token(ls, TK_eof);
-  ls->vstack[0].endpc = fs.pc;
   pt = fs_finish(ls, ls->linenumber);
   L->top--;  /* Drop chunkname. */
   lua_assert(fs.prev == NULL);
