@@ -1,6 +1,6 @@
 print("testing functions and calls")
 
--- get the opportunity to test 'type' too ;)
+print("get the opportunity to test 'type' too ;)")
 
 assert(type(1<2) == 'boolean')
 assert(type(true) == 'boolean' and type(false) == 'boolean')
@@ -13,7 +13,7 @@ function f (x) return a:x (x) end
 assert(type(f) == 'function')
 
 
--- testing local-function recursion
+print("testing local-function recursion")
 fact = false
 do
   local res = 1
@@ -26,7 +26,7 @@ do
 end
 assert(fact == false)
 
--- testing declarations
+print("testing declarations")
 a = {i = 10}
 self = 20
 function a:x (x) return x+self.i end
@@ -99,7 +99,7 @@ end
 deep(10)
 deep(200)
 
--- testing tail call
+print("testing tail call")
 function deep (n) if n>0 then return deep(n-1) else return 101 end end
 assert(deep(30000) == 101)
 a = {}
@@ -114,9 +114,9 @@ a = nil
 assert(a == 23 and (function (x) return x*2 end)(20) == 40)
 
 
--- testing closures
+print("testing closures")
 
--- fixed-point operator
+print("fixed-point operator")
 Z = function (le)
       local function a (f)
         return le(function (x) return f(f)(x) end)
@@ -125,7 +125,7 @@ Z = function (le)
     end
 
 
--- non-recursive factorial
+print("non-recursive factorial")
 
 F = function (f)
       return function (n)
@@ -151,7 +151,7 @@ assert(f(9, 16) == 10+11+12+13+10+9+16+10)
 Z, F, f = nil
 print('+')
 
--- testing multiple returns
+print("testing multiple returns")
 
 function unlpack (t, i)
   i = i or 1
@@ -188,14 +188,14 @@ a = ret2{ unlpack{1,2,3}, unlpack{3,2,1}, unlpack{"a", "b"}}
 assert(a[1] == 1 and a[2] == 3 and a[3] == "a" and a[4] == "b")
 
 
--- testing calls with 'incorrect' arguments
+print("testing calls with 'incorrect' arguments")
 rawget({}, "x", 1)
 rawset({}, "x", 1, 2)
 assert(math.sin(1,2) == math.sin(1))
 table.sort({10,9,8,4,19,23,0,0}, function (a,b) return a<b end, "extra arg")
 
 
--- test for generic load
+print("test for generic load")
 local x = "-- a comment\0\0\0\n  x = 10 + \n23; \
      local a = function () x = 'hi' end; \
      return '\0'"
@@ -214,7 +214,7 @@ end
 
 a = assert(load(read1(x), "modname", "t", _G))
 assert(a() == "\0" and _G.x == 33)
--- cannot read text in binary mode
+print("cannot read text in binary mode")
 cannotload("attempt to load a text chunk", load(read1(x), "modname", "b", {}))
 cannotload("attempt to load a text chunk", load(x, "modname", "b"))
 
@@ -224,12 +224,12 @@ a()  -- empty chunk
 assert(not load(function () return true end))
 
 
--- small bug
+print("small bug")
 local t = {nil, "return ", "3"}
 f, msg = load(function () return table.remove(t, 1) end)
 assert(f() == nil)   -- should read the empty chunk
 
--- another small bug (in 5.2.1)
+print("another small bug (in 5.2.1)")
 f = load(string.dump(function () return 1 end), nil, "b", {})
 assert(type(f) == "function" and f() == 1)
 
@@ -246,12 +246,12 @@ cannotload("unexpected symbol", load(read1("*a = 123")))
 cannotload("unexpected symbol", load("*a = 123"))
 cannotload("hhi", load(function () error("hhi") end))
 
--- any value is valid for _ENV / not in LJX, tables only
+print("any value is valid for _ENV / not in LJX, tables only")
 t={}
 assert(load("return _ENV", nil, nil, t)() == t)
 
 
--- load when _ENV is not first upvalue
+print("load when _ENV is not first upvalue")
 local x; XX = 123
 local function h ()
   local y=x   -- use 'x', so that it becomes 1st upvalue
@@ -264,7 +264,7 @@ assert(x() == 123)
 assert(assert(load("return XX + ...", nil, nil, {XX = 13}))(4) == 17)
 
 
--- test generic load with nested functions
+print("test generic load with nested functions")
 x = [[
   return function (x)
     return function (y)
@@ -279,10 +279,10 @@ a = assert(load(read1(x)))
 assert(a()(2)(3)(10) == 15)
 
 
--- test for dump/undump with upvalues
--- TBD do it without debug.*
+print("test for dump/undump with upvalues")
+print("TBD do it without debug.*")
 
--- test for bug in parameter adjustment
+print("test for bug in parameter adjustment")
 assert((function () return nil end)(4) == nil)
 assert((function () local a; return a end)(4) == nil)
 assert((function (a) return a end)() == nil)

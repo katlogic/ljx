@@ -1002,6 +1002,7 @@ LUA_API int lua_setfenv(lua_State *L, int idx)
 LUA_API const char *lua_setupvalue(lua_State *L, int idx, int n)
 {
   cTValue *f = index2adr(L, idx);
+  GCfunc *fn = funcV(f);
   TValue *val;
   const char *name;
   api_checknelems(L, 1);
@@ -1009,6 +1010,13 @@ LUA_API const char *lua_setupvalue(lua_State *L, int idx, int n)
   if (name) {
     L->top--;
     copyTV(L, val, L->top);
+    /* Is it global env uv? XXX move to lj_func */
+    if (isluafunc(fn) && tvistab(L->top) && (gcref(fn->l.uvptr[n-1])->uv.flags & UV_ENV)) {
+      GCfunc *pfn;
+      /* Then scan linked closures and set their _ENV too */
+      for (pfn = &obj2gco(gcref(fn->l.next_ENV))->fn; pfn != fn; pfn = &obj2gco(gcref(pfn->l.next_ENV))->fn)
+        setgcref(pfn->l.env, obj2gco(tabV(L->top)));
+    }
     lj_gc_barrier(L, funcV(f), L->top);
   }
   return name;
