@@ -135,6 +135,13 @@ static GCfunc *func_newL(lua_State *L, GCproto *pt, GCtab *env)
   return fn;
 }
 
+/* Recursively instantiate closures */
+static inline
+void lj_func_init_closure(lua_State *L, uintptr_t i, GCproto *parentpt, GCfuncL *parent, GCupval *uv)
+{
+  setfuncV(L, &uv->tv, lj_func_newL_gc(L, &proto_kgc(parentpt, (~i))->pt, parent));
+}
+
 /* Create a new Lua function with empty upvalues. */
 GCfunc *lj_func_newL_empty(lua_State *L, GCproto *pt, GCtab *env)
 {
@@ -147,6 +154,8 @@ GCfunc *lj_func_newL_empty(lua_State *L, GCproto *pt, GCtab *env)
     uv->flags = (v >> PROTO_UV_SHIFT); /* XXX maybe only UV_ENV? */
     uv->dhash = (uint32_t)(uintptr_t)pt ^ ((uint32_t)proto_uv(pt)[i] << 24);
     setgcref(fn->l.uvptr[i], obj2gco(uv));
+    if (uv->flags & UV_CLOSURE)
+      lj_func_init_closure(L, v & PROTO_UV_MASK, pt, &fn->l, uv);
   }
   fn->l.nupvalues = (uint8_t)nuv;
   return fn;
@@ -168,7 +177,10 @@ GCfunc *lj_func_newL_gc(lua_State *L, GCproto *pt, GCfuncL *parent)
   for (i = 0; i < nuv; i++) {
     uint32_t v = proto_uv(pt)[i];
     GCupval *uv;
-    if ((v & PROTO_UV_LOCAL)) {
+    if (v & PROTO_UV_CLOSURE) {
+      uv = func_emptyuv(L);
+      lj_func_init_closure(L, v & PROTO_UV_MASK, pt, &fn->l, uv);
+    } else if ((v & PROTO_UV_LOCAL)) {
       uv = func_finduv(L, base + (v & 0xff));
       uv->flags = v >> PROTO_UV_SHIFT;
       uv->dhash = (uint32_t)(uintptr_t)mref(parent->pc, char) ^ (v << 24);

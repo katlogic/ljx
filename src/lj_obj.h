@@ -319,6 +319,7 @@ typedef struct GCproto {
 /* Only used during parsing. */
 #define PROTO_HAS_RETURN	0x20	/* Already emitted a return. */
 #define PROTO_FIXUP_RETURN	0x40	/* Need to fixup emitted returns. */
+#define PROTO_LIFTED            0x80    /* This closure has been lifted. */
 /* Top bits used for counting created closures. */
 #define PROTO_CLCOUNT		0x20	/* Base of saturating 3 bit counter. */
 #define PROTO_CLC_BITS		3
@@ -328,13 +329,15 @@ typedef struct GCproto {
 #define PROTO_UV_LOCAL		0x8000	/* Upvalue for local slot. */
 #define PROTO_UV_IMMUTABLE	0x4000	/* Immutable upvalue. */
 #define PROTO_UV_ENV            0x2000	/* Refers to _ENV. */
-#define PROTO_UV_MASK           0x1fff
-#define PROTO_UV_SHIFT          13
+#define PROTO_UV_CLOSURE        0x1000	/* Refers to closure. */
+#define PROTO_UV_MASK           0x0fff  /* Can have 4096 upvalues */
+#define PROTO_UV_SHIFT          12
 
 /* For uv->flags */
 #define UV_LOCAL      (PROTO_UV_LOCAL>>PROTO_UV_SHIFT)
 #define UV_IMMUTABLE  (PROTO_UV_IMMUTABLE>>PROTO_UV_SHIFT)
 #define UV_ENV        (PROTO_UV_LOCAL>>PROTO_UV_SHIFT)
+#define UV_CLOSURE    (PROTO_UV_CLOSURE>>PROTO_UV_SHIFT)
 
 #define proto_kgc(pt, idx) \
   check_exp((uintptr_t)(intptr_t)(idx) >= (uintptr_t)-(intptr_t)(pt)->sizekgc, \
