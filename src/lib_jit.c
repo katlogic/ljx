@@ -184,7 +184,8 @@ LJLIB_CF(jit_util_funcinfo)
   if (pt) {
     BCPos pc = (BCPos)lj_lib_optint(L, 2, 0);
     GCtab *t;
-    lua_createtable(L, 0, 16);  /* Increment hash size if fields are added. */
+    int i;
+    lua_createtable(L, 0, 17);  /* Increment hash size if fields are added. */
     t = tabV(L->top-1);
     setintfield(L, t, "linedefined", pt->firstline);
     setintfield(L, t, "lastlinedefined", pt->firstline + pt->numline);
@@ -204,6 +205,11 @@ LJLIB_CF(jit_util_funcinfo)
     lua_setfield(L, -2, "source");
     lj_debug_pushloc(L, pt, pc);
     lua_setfield(L, -2, "loc");
+    /* UV prototype fields. TBD: ditto for consts? */
+    lua_createtable(L, pt->sizeuv+1, 0);
+    for (i = 0; i < pt->sizeuv; i++)
+      setintV(lj_tab_setint(L, tabV(L->top-1), i+1), proto_uv(pt)[i]);
+    lua_setfield(L, -2, "uvinit");
   } else {
     GCfunc *fn = funcV(L->base);
     GCtab *t;
