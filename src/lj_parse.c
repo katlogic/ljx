@@ -1973,7 +1973,7 @@ static void parse_body(LexState *ls, ExpDesc *e, int needself, BCLine line)
   pfs->bcbase = ls->bcstack + oldbase;  /* May have been reallocated. */
   pfs->bclim = (BCPos)(ls->sizebcstack - oldbase);
   /* Store new prototype in the constant array of the parent. */
-  if (1 && (!(fs.flags & PROTO_LIFTED)))
+  if (!(fs.flags & PROTO_LIFTED))
     expr_init(e, VRELOCABLE,
 	    bcemit_AD(pfs, BC_FNEW, 0, const_gc(pfs, obj2gco(pt), LJ_TPROTO)));
   else {
