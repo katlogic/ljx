@@ -5,9 +5,7 @@ local dummy
 local function cc(n)
   local res
   do
-	if (n % 100000) == 0 then
-		dummy = function() return dummy end
-	end
+	dummy = function() return dummy end
 	local za=upv+4
 	res=za+1
   end

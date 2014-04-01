@@ -112,7 +112,7 @@ typedef struct FuncScope {
 
 /* Index into variable stack. */
 typedef uint16_t VarIndex;
-#define LJ_MAX_VSTACK		(65536 - LJ_MAX_UPVAL)
+#define LJ_MAX_VSTACK		(PROTO_UV_MASK - LJ_MAX_UPVAL)
 
 /* Variable/goto/label info. */
 #define VSTACK_VAR_RW		0x01	/* R/W variable. */
@@ -142,7 +142,7 @@ typedef struct FuncState {
   uint8_t nuv;			/* Number of upvalues */
   VarIndex varmap[LJ_MAX_LOCVAR];  /* Map from register to variable idx. */
   VarIndex uvmap[LJ_MAX_UPVAL];	/* Map from upvalue to variable idx. */
-  VarIndex uvtmp[LJ_MAX_UPVAL];	/* Temporary upvalue map. */
+  VarIndex uvtmp[LJ_MAX_UPVAL];	/* Map from upvalue to uv index in parent scope. */
 } FuncState;
 
 /* Binary and unary operators. ORDER OPR */
@@ -1365,7 +1365,9 @@ static void fs_fixup_uv2(FuncState *fs, GCproto *pt)
   MSize i, n = pt->sizeuv;
   for (i = 0; i < n; i++) {
     VarIndex vidx = uv[i];
-    if (vidx >= LJ_MAX_VSTACK)
+    if (vidx & PROTO_UV_CLOSURE)
+      uv[i] = vidx;
+    else if (vidx >= LJ_MAX_VSTACK)
       uv[i] = (vidx -= LJ_MAX_VSTACK);
     else if ((vstack[vidx].info & VSTACK_VAR_RW))
       uv[i] = vstack[vidx].slot | PROTO_UV_LOCAL;
@@ -1433,9 +1435,12 @@ static void fs_fixup_k(FuncState *fs, GCproto *pt, void *kptr)
 /* Fixup upvalues for prototype, step #1. */
 static void fs_fixup_uv1(FuncState *fs, GCproto *pt, uint16_t *uv)
 {
+  int i;
   setmref(pt->uv, uv);
   pt->sizeuv = fs->nuv;
-  memcpy(uv, fs->uvtmp, fs->nuv*sizeof(VarIndex));
+  for (i = 0; i < fs->nuv; i++) {
+    uv[i] = ((fs->uvmap[i]==LJ_MAX_VSTACK)?PROTO_UV_CLOSURE:0)+fs->uvtmp[i];
+  }
 }
 
 #ifndef LUAJIT_DISABLE_DEBUGINFO
@@ -1488,10 +1493,18 @@ static size_t fs_prep_var(LexState *ls, FuncState *fs, size_t *ofsvar)
   lj_buf_reset(&ls->sb);  /* Copy to temp. string buffer. */
   /* Store upvalue names. */
   for (i = 0, n = fs->nuv; i < n; i++) {
-    GCstr *s = strref(vs[fs->uvmap[i]].name);
-    MSize len = s->len+1;
-    char *p = lj_buf_more(&ls->sb, len);
-    p = lj_buf_wmem(p, strdata(s), len);
+    char *p;
+    const char *ss = "";
+    MSize len = 1;
+    VarIndex idx = fs->uvmap[i];
+    /* Named var? */
+    if (idx < LJ_MAX_VSTACK) {
+      GCstr *s = strref(vs[idx].name);
+      len += s->len;
+      ss = strdata(s);
+    }
+    p = lj_buf_more(&ls->sb, len);
+    p = lj_buf_wmem(p, ss, len);
     setsbufP(&ls->sb, p);
   }
   *ofsvar = sbuflen(&ls->sb);
@@ -1590,6 +1603,61 @@ static void fs_fixup_ret(FuncState *fs)
   }
 }
 
+static void fs_fixup_ll(FuncState *fs, GCproto *pt)
+{
+  FuncState *p = fs;
+  VarIndex uvtmp[LJ_MAX_UPVAL];
+  int n;
+  if (!fs->prev) return;
+
+  /* Climb up the scopes as long all upvalues are nonlocal */
+  memcpy(uvtmp, p->uvtmp, sizeof(uvtmp));
+  n = fs->nuv;
+  while (p->prev) {
+    int i;
+    /* check that we can advance one frame */
+    for (i = 0; i < n; i++) {
+      if (uvtmp[i] < LJ_MAX_VSTACK) {
+        lua_assert(uvtmp[i] <= fs->ls->vtop);
+        /* otherwise we're done */
+        goto out;
+      }
+    }
+    p = p->prev;
+    /* propagate one frame */
+    for (i = 0; i < n; i++) {
+      VarIndex uvi = uvtmp[i] - LJ_MAX_VSTACK;
+      lua_assert(uvi < p->nuv);
+      uvtmp[i] = p->uvtmp[uvi];
+    }
+  }
+out:;
+  /* Target scope is now in p */
+  if (p == fs) return;
+
+  /* Constant table full */
+  if (p->nkgc >= PROTO_UV_MASK) return;
+
+  /* Superscalar cpu trivia:
+   * Fixed-size copies are always faster; up to several kb. */
+  memcpy(fs->uvtmp, uvtmp, sizeof(uvtmp));
+
+  /* Tell the upper scope that it adopted the closure */
+  p->uvmap[p->nuv] = LJ_MAX_VSTACK; /* No-name; PROTO_UV_CLOSURE; */
+  p->uvtmp[p->nuv] = const_gc(p, obj2gco(pt), LJ_TPROTO); /* Store constant index */
+
+
+  /* Tell the child's ex-family to reach it via upvalue. */
+  fs->flags |= PROTO_LIFTED;
+  if (fs->prev == p) p->nuv++;
+  while (fs->prev != p) {
+    fs->prev->uvmap[fs->prev->nuv] = LJ_MAX_VSTACK+1; /* No-name */
+    fs->prev->uvtmp[fs->prev->nuv++] = LJ_MAX_VSTACK +
+      fs->prev->prev->nuv++; /* This will p->nuv++ as last! */
+    fs = fs->prev;
+  }
+}
+
 /* Finish a FuncState and return the new prototype. */
 static GCproto *fs_finish(LexState *ls, BCLine line)
 {
@@ -1622,6 +1690,7 @@ static GCproto *fs_finish(LexState *ls, BCLine line)
 
   /* Close potentially uninitialized gap between bc and kgc. */
   *(uint32_t *)((char *)pt + ofsk - sizeof(GCRef)*(fs->nkgc+1)) = 0;
+  fs_fixup_ll(fs, pt);
   fs_fixup_bc(fs, pt, (BCIns *)((char *)pt + sizeof(GCproto)), fs->pc);
   fs_fixup_k(fs, pt, (void *)((char *)pt + ofsk));
   fs_fixup_uv1(fs, pt, (uint16_t *)((char *)pt + ofsuv));
@@ -1643,6 +1712,8 @@ static GCproto *fs_finish(LexState *ls, BCLine line)
 static void fs_init(LexState *ls, FuncState *fs)
 {
   lua_State *L = ls->L;
+  memset(fs->uvtmp, 0xff, sizeof fs->uvtmp);
+  memset(fs->uvmap, 0xff, sizeof fs->uvmap);
   fs->prev = ls->fs; ls->fs = fs;  /* Append to list. */
   fs->ls = ls;
   fs->vbase = ls->vtop;
@@ -1902,8 +1973,13 @@ static void parse_body(LexState *ls, ExpDesc *e, int needself, BCLine line)
   pfs->bcbase = ls->bcstack + oldbase;  /* May have been reallocated. */
   pfs->bclim = (BCPos)(ls->sizebcstack - oldbase);
   /* Store new prototype in the constant array of the parent. */
-  expr_init(e, VRELOCABLE,
+  if (1 && (!(fs.flags & PROTO_LIFTED)))
+    expr_init(e, VRELOCABLE,
 	    bcemit_AD(pfs, BC_FNEW, 0, const_gc(pfs, obj2gco(pt), LJ_TPROTO)));
+  else {
+    /* The closure has been lifted. fs_finish installed upval in pfs. */
+    expr_init(e, VRELOCABLE, bcemit_AD(pfs, BC_UGET, 0, pfs->nuv-1));
+  }
 #if LJ_HASFFI
   pfs->flags |= (fs.flags & PROTO_FFI);
 #endif
@@ -2536,6 +2612,7 @@ static void parse_for_num(LexState *ls, GCstr *varname, BCLine line)
 static int predict_next(LexState *ls, FuncState *fs, BCPos pc)
 {
   BCIns ins = fs->bcbase[pc].ins;
+  VarIndex idx;
   GCstr *name;
   cTValue *o;
   switch (bc_op(ins)) {
@@ -2543,7 +2620,9 @@ static int predict_next(LexState *ls, FuncState *fs, BCPos pc)
     name = gco2str(gcref(var_get(ls, fs, bc_d(ins)).name));
     break;
   case BC_UGET:
-    name = gco2str(gcref(ls->vstack[fs->uvmap[bc_d(ins)]].name));
+    idx = fs->uvmap[bc_d(ins)];
+    if (idx > LJ_MAX_VSTACK) return 0; /* UV not associated with var */
+    name = gco2str(gcref(ls->vstack[idx].name));
     break;
   case BC_GGET:
     /* There's no inverse index (yet), so lookup the strings. */
@@ -2768,7 +2847,7 @@ GCproto *lj_parse(LexState *ls)
   L->top--;  /* Drop chunkname. */
   lua_assert(fs.prev == NULL);
   lua_assert(ls->fs == NULL);
-  lua_assert(pt->sizeuv == 1);
+//  lua_assert(pt->sizeuv == 1);
   return pt;
 }
 
