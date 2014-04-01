@@ -2206,10 +2206,22 @@ void lj_record_ins(jit_State *J)
       lj_ffrecord_func(J);
       break;
     }
+  case BC_UCLO:
+    if (ra < J->maxslot)
+      J->maxslot = ra;  /* Shrink used slots. */
+
+    /* No UVs to be closed -> NOP */
+    if (!gcref(J->L->openupval))
+      break;
+
+    /* UVs to be closed; but none concerning us for now */
+    if (uvval((gco2uv(gcref(J->L->openupval)))) < (lbase + rc))
+      break;
+
+    /* TBD: Need to close UV -> call lj_func_closeuv */
     /* fallthrough */
   case BC_ITERN:
   case BC_ISNEXT:
-  case BC_UCLO:
   case BC_FNEW:
   case BC_ESETV:
     setintV(&J->errinfo, (int32_t)op);
