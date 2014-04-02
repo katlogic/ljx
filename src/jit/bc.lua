@@ -124,7 +124,8 @@ local function bctargets(func)
 end
 
 -- Dump bytecode instructions of a function.
-local function bcdump(func, out, all)
+local function bcdump(func, out, all, prefix)
+  prefix = prefix or ""
   if not out then out = stdout end
   local fi = funcinfo(func)
   if all and fi.children then
@@ -134,24 +135,33 @@ local function bcdump(func, out, all)
       if type(k) == "proto" then bcdump(k, out, true) end
     end
   end
-  out:write(format("+- BYTECODE -- %s-%d\n", fi.loc, fi.lastlinedefined))
+  out:write(format(prefix.."+- BYTECODE -- %s-%d\n", fi.loc, fi.lastlinedefined))
   for i=1,(#fi.uvinit) do
     local uvv = band(fi.uvinit[i],0xfff) -- ORDER PROTO_UV_* in lj_obj.h
-    local loc = band(fi.uvinit[i],0x4000)~=0 and " LOCAL" or ""
+    local loc = band(fi.uvinit[i],0x8000)~=0 and " PARENT" or ""
     local imu = band(fi.uvinit[i],0x4000)~=0 and " IMMUTABLE" or ""
     local env = band(fi.uvinit[i],0x2000)~=0 and " ENV" or ""
     local clo = band(fi.uvinit[i],0x1000)~=0 and " CLOSURE" or ""
-    out:write(("| UV@%d = %d%s%s%s%s\n"):format(i-1,uvv,loc,imu,env,clo))
+    out:write((prefix.."| UV@%d = %d%s%s%s%s\n"):format(i-1,uvv,loc,imu,env,clo))
+    if clo ~= "" then
+      local k = funck(func, -band(fi.uvinit[i],0xfff)-1)
+      out:write(prefix .. "|   |\n")
+      if k then
+        bcdump(k, out, nil, prefix .. "|   ")
+      else
+        print ("cant load k",-band(fi.uvinit[i],0xfff)-1)
+      end
+    end
   end
-  print("+-----------")
+  out:write(prefix.."+-----------\n")
 
   local target = bctargets(func)
   for pc=1,1000000000 do
     local s = bcline(func, pc, target[pc] and "=>")
     if not s then break end
-    out:write(s)
+    out:write(prefix .. s)
   end
-  out:write("\n")
+  out:write(prefix.."\n")
   out:flush()
 end
 

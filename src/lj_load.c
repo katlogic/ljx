@@ -30,7 +30,7 @@ static TValue *cpparser(lua_State *L, lua_CFunction dummy, void *ud)
   LexState *ls = (LexState *)ud;
   GCproto *pt;
   GCfunc *fn;
-  int bc,i;
+  int bc;
   UNUSED(dummy);
   cframe_errfunc(L->cframe) = -1;  /* Inherit error function. */
   bc = lj_lex_setup(L, ls);
@@ -40,10 +40,6 @@ static TValue *cpparser(lua_State *L, lua_CFunction dummy, void *ud)
   }
   pt = bc ? lj_bcread(ls) : lj_parse(ls);
   fn = lj_func_newL_empty(L, pt, tabref(L->env));
-  /* Look for _ENV upval; if any */
-  for (i = 0; i < pt->sizeuv; i++)
-    if (proto_uv(pt)[i] & PROTO_UV_ENV)
-      settabV(L, uvval(&gcref(fn->l.uvptr[i])->uv), tabref(L->env));
   /* Don't combine above/below into one statement. */
   setfuncV(L, L->top++, fn);
   return NULL;

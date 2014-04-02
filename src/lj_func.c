@@ -154,8 +154,15 @@ GCfunc *lj_func_newL_empty(lua_State *L, GCproto *pt, GCtab *env)
     uv->flags = (v >> PROTO_UV_SHIFT); /* XXX maybe only UV_ENV? */
     uv->dhash = (uint32_t)(uintptr_t)pt ^ ((uint32_t)proto_uv(pt)[i] << 24);
     setgcref(fn->l.uvptr[i], obj2gco(uv));
-    if (uv->flags & UV_CLOSURE)
+    if (uv->flags & UV_ENV)
+      settabV(L, &uv->tv, env);
+  }
+  for (i = 0; i < nuv; i++) {
+    uint16_t v = proto_uv(pt)[i];
+    if (v & PROTO_UV_CLOSURE) {
+      GCupval *uv = &gcref(fn->l.uvptr[i])->uv;
       lj_func_init_closure(L, v & PROTO_UV_MASK, pt, &fn->l, uv);
+    }
   }
   fn->l.nupvalues = (uint8_t)nuv;
   return fn;
@@ -174,29 +181,45 @@ GCfunc *lj_func_newL_gc(lua_State *L, GCproto *pt, GCfuncL *parent)
   puv = parent->uvptr;
   nuv = pt->sizeuv;
   base = L->base;
+  fn->l.nupvalues = (uint8_t)nuv;
   for (i = 0; i < nuv; i++) {
     uint32_t v = proto_uv(pt)[i];
     GCupval *uv;
+    /* Closure UV */
     if (v & PROTO_UV_CLOSURE) {
       uv = func_emptyuv(L);
-      lj_func_init_closure(L, v & PROTO_UV_MASK, pt, &fn->l, uv);
-    } else if ((v & PROTO_UV_LOCAL)) {
-      uv = func_finduv(L, base + (v & 0xff));
       uv->flags = v >> PROTO_UV_SHIFT;
-      uv->dhash = (uint32_t)(uintptr_t)mref(parent->pc, char) ^ (v << 24);
-    } else {
+      setgcref(fn->l.uvptr[i], obj2gco(uv));
+      continue;
+    /* Inherited from parent */
+    } else if (v & PROTO_UV_PARENT) {
       uv = &gcref(puv[v & PROTO_UV_MASK])->uv;
-      /* Inherited env - link it in same group */
-      if (v & PROTO_UV_ENV) {
+      lua_assert(uv);
+      /* And global _ENV? */
+      if (uv->flags & UV_ENV) {
         setgcref(fn->l.next_ENV, obj2gco(parent));
         fn->l.prev_ENV = parent->prev_ENV;
         setgcref(gcref(fn->l.prev_ENV)->fn.l.next_ENV, obj2gco(fn));
         setgcref(parent->prev_ENV, obj2gco(fn));
       }
+    /* Otherwise new local UV */
+    } else {
+      uv = func_finduv(L, base + (v & 0xff));
+      uv->flags = v >> PROTO_UV_SHIFT;
+      uv->dhash = (uint32_t)(uintptr_t)mref(parent->pc, char) ^ (v << 24);
     }
     setgcref(fn->l.uvptr[i], obj2gco(uv));
   }
-  fn->l.nupvalues = (uint8_t)nuv;
+
+  /* Do this later as those may refer our uvs. TODO: make this faster */
+  for (i = 0; i < nuv; i++) {
+    uint32_t v = proto_uv(pt)[i];
+    if (v & PROTO_UV_CLOSURE) {
+      GCupval *uv= &gcref(fn->l.uvptr[v & PROTO_UV_MASK])->uv;
+      lj_func_init_closure(L, v & PROTO_UV_MASK, pt, &fn->l, uv);
+    }
+  }
+
   return fn;
 }
 
