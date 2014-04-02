@@ -68,11 +68,12 @@
 #define JIT_F_OPT_ABC		0x00800000
 #define JIT_F_OPT_SINK		0x01000000
 #define JIT_F_OPT_FUSE		0x02000000
+#define JIT_F_OPT_LLIFT		0x04000000
 
 /* Optimizations names for -O. Must match the order above. */
 #define JIT_F_OPT_FIRST		JIT_F_OPT_FOLD
 #define JIT_F_OPTSTRING	\
-  "\4fold\3cse\3dce\3fwd\3dse\6narrow\4loop\3abc\4sink\4fuse"
+  "\4fold\3cse\3dce\3fwd\3dse\6narrow\4loop\3abc\4sink\4fuse\5llift"
 
 /* Optimization levels set a fixed combination of flags. */
 #define JIT_F_OPT_0	0
