@@ -142,7 +142,7 @@ local function bcdump(func, out, all, prefix)
     local imu = band(fi.uvinit[i],0x4000)~=0 and " IMMUTABLE" or ""
     local env = band(fi.uvinit[i],0x2000)~=0 and " ENV" or ""
     local clo = band(fi.uvinit[i],0x1000)~=0 and " CLOSURE" or ""
-    out:write((prefix.."| UV@%d = %d%s%s%s%s\n"):format(i-1,uvv,loc,imu,env,clo))
+    out:write((prefix.."| UV@%d = %d%s%s%s%s %04x\n"):format(i-1,uvv,loc,imu,env,clo,fi.uvinit[i]))
     if clo ~= "" then
       local k = funck(func, -band(fi.uvinit[i],0xfff)-1)
       out:write(prefix .. "|   |\n")
