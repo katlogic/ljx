@@ -136,6 +136,8 @@ typedef uintptr_t BloomFilter;
 #define LJ_LIKELY(x)	__builtin_expect(!!(x), 1)
 #define LJ_UNLIKELY(x)	__builtin_expect(!!(x), 0)
 
+#define LJ_RESTRICT
+
 #define lj_ffs(x)	((uint32_t)__builtin_ctz(x))
 /* Don't ask ... */
 #if defined(__INTEL_COMPILER) && (defined(__i386__) || defined(__x86_64__))

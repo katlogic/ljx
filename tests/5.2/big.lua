@@ -41,6 +41,7 @@ print(" errors in accesses larger than K (in RK)")
 getmetatable(env).__index = function () end
 getmetatable(env).__newindex = function () end
 local e, m = pcall(f)
+print(m)
 assert(not e and m:find("global 'X'"))
 
 print(" errors in metamethods ")

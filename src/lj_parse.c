@@ -143,8 +143,10 @@ typedef struct FuncState {
   uint8_t numparams;		/* Number of parameters. */
   uint8_t framesize;		/* Fixed frame size. */
   uint8_t nuv;			/* Number of upvalues */
-  VarIndex varmap[LJ_MAX_LOCVAR];  /* Map from register to variable idx. */
-  VarIndex uvmap[LJ_MAX_UPVAL];	/* Map from upvalue to variable idx. */
+  VarIndex varmap[LJ_MAX_LOCVAR];  /* Map from register to vstack idx. */
+  VarIndex uvmap[LJ_MAX_UPVAL];	/* Map from upvalue to vstack idx. */
+  VarIndex uvval[LJ_MAX_UPVAL]; /* Upvalue in proto (index and flags). */
+  uint8_t uvcount[LJ_MAX_UPVAL]; /* Usage count of each upvalue link. */
 } FuncState;
 
 /* Binary and unary operators. ORDER OPR */
@@ -628,7 +630,7 @@ static void bcemit_store(FuncState *fs, ExpDesc *var, ExpDesc *e)
     fs->ls->vstack[var->u.s.aux].info |= VSTACK_VAR_RW;
     expr_toval(fs, e);
     /* setting _ENV is special opcode */
-    if (var->u.s.aux == LJ_MAX_VSTACK)
+    if (var->u.s.aux == 0)
       ins = BCINS_AD(BC_ESETV, var->u.s.info, expr_toanyreg(fs, e));
     else if (e->k <= VKTRUE)
       ins = BCINS_AD(BC_USETP, var->u.s.info, const_pri(e));
@@ -1076,33 +1078,9 @@ static void var_add(LexState *ls, BCReg nvars)
 static void var_remove(LexState *ls, BCReg tolevel)
 {
   FuncState *fs = ls->fs;
-  while (fs->nactvar > tolevel)
+  while (fs->nactvar > tolevel) {
     var_get(ls, fs, --fs->nactvar).endpc = fs->pc;
-}
-
-/* Lookup local variable name. */
-static BCReg var_lookup_local(FuncState *fs, GCstr *n)
-{
-  int i;
-  for (i = fs->nactvar-1; i >= 0; i--) {
-    if (n == strref(var_get(fs->ls, fs, i).name))
-      return (BCReg)i;
   }
-  return (BCReg)-1;  /* Not found. */
-}
-
-/* Lookup or add upvalue index. */
-static MSize var_lookup_uv(FuncState *fs, MSize vidx)
-{
-  MSize i, n = fs->nuv;
-  for (i = 0; i < n; i++)
-    if (fs->uvmap[i] == vidx)
-      return i;  /* Already exists. */
-  /* Otherwise create a new one. */
-  checklimit(fs, fs->nuv, LJ_MAX_UPVAL, "upvalues");
-  fs->uvmap[n] = (uint16_t)vidx;
-  fs->nuv = n+1;
-  return n;
 }
 
 /* Mark scope as having an upvalue. */
@@ -1119,58 +1097,95 @@ static void fscope_uvmark(FuncState *fs, BCReg level)
 static void expr_index(FuncState *fs, ExpDesc *t, ExpDesc *e);
 
 /*
- * Look up variable 'name' in all frames, with _ENV scoping.
- * Upvalues will be connected later in fixup_uv2.
+ * Look-up variable 'name' in all frames, with _ENV scoping,
+ * create upvalue links if necessary.
+ *
+ * The code is a bit of spaghetti; but avoids recursion.
+ * Variable lookups happen a lot.
  */
-static int do_var_lookup(LexState *ls, ExpDesc *e, GCstr *name)
+static void do_var_lookup(LexState LJ_RESTRICT *ls, ExpDesc LJ_RESTRICT *e, GCstr LJ_RESTRICT *name)
 {
   ExpDesc key;
-  BCReg reg;
-  FuncState *pfs, *fs = ls->fs;
+  int i, uvidx, uvres, vidx, hasenv = 0;
+  FuncState LJ_RESTRICT *frame, *uvfs, *fs = ls->fs;
+  VarInfo *vstack = ls->vstack;
+  GCstr *nref;
 
-
-  /* Walk scopes looking for local */
-  for (pfs = fs; pfs; pfs = pfs->prev) {
-    reg = var_lookup_local(pfs, name);
-    if ((int32_t)reg >= 0) {
-      if (pfs == fs) {
-        /* A local. */
-        expr_init(e, VLOCAL, reg);
-        e->u.s.aux = (uint32_t)pfs->varmap[reg];
-        fscope_uvmark(fs, reg);
-        return 1; /* local */
+  /* Walk both upvalues and locals in single loop. */
+  for (frame = fs; frame; frame = frame->prev) {
+    int nvar = frame->nactvar-1;
+    int nuv = frame->nuv;
+    /* First, search known locals. */
+    for (i = nvar; i >= 0; i--) {
+      vidx = frame->varmap[i];
+      nref = strref(vstack[vidx].name);
+      if (vidx && (nref == ls->env)) hasenv = 1;
+      if (nref != name)
+        continue;
+      /* Found a local. */
+      uvidx = e->u.s.aux = vidx;
+      if (frame == fs) { /* In our scope. */
+        expr_init(e, VLOCAL, i);
+        return;
       }
       /* An upvalue. */
-      if (pfs == fs->prev) fs->flags &= ~PROTO_LIFTED; /* Direct parent; cannot lift. */
-      expr_init(e, VUPVAL, var_lookup_uv(fs, e->u.s.aux = pfs->varmap[reg]));
-      return 1;
+      fscope_uvmark(frame, i);
+      uvres = fs->nuv; /* If frame == fs->prev. */
+      goto link_uvs; /* Link upvalue chain. */
+    }
+
+    /* Now search upvalues we already know about. */
+    for (i = 0; i < nuv; i++) {
+      vidx = frame->uvmap[i]; /* vstack[] index. */
+      if (vidx == LJ_MAX_VSTACK) continue;
+      nref = strref(vstack[vidx].name);
+      if (nref != name) continue; /* Not found. */
+      uvidx = i | PROTO_UV_CHAINED; /* Used if frame != fs. */
+      uvres = i; /* Used if frame == fs. */
+      goto link_uvs; /* Extend upvalue chain if necessary. */
     }
   }
 
-  /* Looking for _ENV itself? */
-  if (name == fs->ls->env) {
-    expr_init(e, VUPVAL, 0);
-    e->u.s.aux = LJ_MAX_VSTACK;
-    /* Create the global _ENV upvalue */
-    e->u.s.info = var_lookup_uv(ls->fs, LJ_MAX_VSTACK);
-    e->k = VUPVAL;
-    return 0;
-  }
-
-  /* Try to find existing _ENV */
-  if (do_var_lookup(ls, e, ls->env)) {
-    /* And transform expr to _ENV.name */
+  /* Nothing found, it is global. */
+  do_var_lookup(ls, e, ls->env);
+  if (hasenv) { /* lexical _ENV.name */
     expr_init(&key, VKSTR, 0);
     key.u.sval = name;
     expr_toanyreg(ls->fs, e);
     expr_index(ls->fs, e, &key);
-    return 1;
+    return;
   }
 
-  /* No _ENV, it is truly global */
+  /* Otherwise true global. */
   expr_init(e, VGLOBAL, 0);
   e->u.sval = name;
-  return 0;
+  return;
+
+link_uvs:;
+  uvfs = fs; /* For incrementing refcount. */
+  /* Create or extend UV chain to a local. */
+  if (frame != fs) { /* Not in origin scope */
+    uvres = uvfs->nuv;
+    for (; uvfs->prev != frame; uvfs = uvfs->prev) {
+      /* Link chain until uvfs->prev = frame. */
+      uvfs->uvval[uvfs->nuv] = uvfs->prev->nuv | PROTO_UV_CHAINED;
+      uvfs->uvcount[uvfs->nuv] = 1;
+      uvfs->uvmap[uvfs->nuv++] = vidx;
+    }
+    /* And put final pointer there. */
+    uvfs->uvval[uvfs->nuv] = uvidx;
+    uvfs->uvmap[uvfs->nuv] = vidx;
+    uvfs->uvcount[uvfs->nuv++] = 1;
+    /* If connected to previous UV chain, bump refcount of all links. */
+    while (uvidx & PROTO_UV_CHAINED) {
+      uvidx &= PROTO_UV_MASK;
+      uvfs = uvfs->prev;
+      uvfs->uvcount[uvidx]++;
+      uvidx = uvfs->uvval[uvidx];
+    }
+  } else uvfs->uvcount[uvres]++; /* Resident UV. */
+  expr_init(e, VUPVAL, uvres);
+  e->u.s.aux = vidx;
 }
 
 #define var_lookup(ls, e) do_var_lookup(ls, e, lex_str(ls))
@@ -1344,101 +1359,20 @@ static void fs_fixup_bc(FuncState *fs, GCproto *pt, BCIns *bc, MSize n)
     bc[i] = base[i].ins;
 }
 
-/* Resolve real UV values. fs is parent of pt. */
-static void fs_fixup_uv1(FuncState *fs, GCproto *pt)
+/* Fixup upvalues for child prototype, step #2. */
+static void fs_fixup_uv2(FuncState *fs, GCproto *pt)
 {
-  int i,n = pt->sizeuv;
-  uint16_t *uv = proto_uv(pt);
-  lua_assert(!(pt->flags & PROTO_LIFTED));
-  for (i = 0; i < n; i++) {
-    if (uv[i] == LJ_MAX_VSTACK) { /* Points to _ENV */
-      uv[i] = fs?((var_lookup_uv(fs, LJ_MAX_VSTACK)|PROTO_UV_PARENT)):PROTO_UV_ENV;
-    } else if (uv[i] > PROTO_UV_MASK) { /* already fixed up */
-      uv[i] = uv[i];
-    } else if (fs && (uv[i] >= fs->vbase)) { /* Points to parent? */
-      /* This will be also augmented with with immutable in uv2 */
-      uv[i] = fs->ls->vstack[uv[i]].slot;
-    } else if (fs) /* Points to previous upvalue */
-      uv[i] = var_lookup_uv(fs, uv[i])|PROTO_UV_PARENT;
-  }
-}
-
-/* Verify that a closure can be lifted further */
-static void fs_lift_check(FuncState *pfs, GCproto *pt)
-{
-  int j;
-  if (!pfs->prev) /* No parent to move further to */
-    pt->flags &= ~PROTO_LIFTED;
-  else for (j = 0; j < pt->sizeuv; j++) {
-    VarIndex vidx = proto_uv(pt)[j];
-    /* refs to vars in pfs must not happen at this point */
-    printf("%d %d\n", vidx, pfs->vbase);
-    lua_assert(!((vidx > pfs->vbase) && (vidx < LJ_MAX_VSTACK)));
-    /* refs to slot in pfs parent stops lifting. */
-    if ((vidx >= pfs->prev->vbase) && (vidx < pfs->vbase)) {
-      pt->flags &= ~PROTO_LIFTED;
-      fs_fixup_uv1(pfs, pt);
-      break;
-    }
-  }
-
-  /* If not, finalize. */
-  if (!(pt->flags & PROTO_LIFTED))
-      fs_fixup_uv1(pfs, pt);
-}
-
-
-/* Fixup upvalues for child prototypes */
-static void fs_fixup_uv2(FuncState *fs)
-{
-  GCtab *kt = fs->kt;
-  Node *node;
-  MSize j,i, hmask;
   VarInfo *vstack = fs->ls->vstack;
-
-  node = noderef(kt->node);
-  hmask = kt->hmask;
-
-  for (i = 0; i <= hmask; i++) {
-    Node *n = &node[i];
-    GCproto *pt;
-    uint16_t *uv;
-    int idx = -1; /* uv# which points to to that proto const */
-    ptrdiff_t kidx;
-    if ((!tvhaskslot(&n->val)) || !tvisproto(&n->key)) continue;
-
-    /* pt points to child */
-    kidx = (ptrdiff_t)tvkslot(&n->val);
-    pt = gco2pt(gcV(&n->key));
-    uv = proto_uv(pt);
-
-    /* pt wants to be lifted to fs->prev */
-    if (pt->flags & PROTO_LIFTED) {
-      /* Find out which of our UV refers to that proto */
-      for (j = 0; j < fs->nuv; j++) {
-        if ((fs->uvmap[j] & PROTO_UV_CLOSURE) && ((fs->uvmap[j] & PROTO_UV_MASK) == kidx))
-          idx = j;
-      }
-      setintV(&n->key,0);  /* Nuke the const. */
-      lua_assert(idx != -1);
-      /* Short-circuit the references to us. */
-      for (j = 0; j < pt->sizeuv; j++)
-        if (uv[j] & PROTO_UV_PARENT) {
-          uv[j] = fs->uvmap[uv[j] & PROTO_UV_MASK];
-        }
-      /* create parent link */
-      fs->uvmap[idx] = (fs->prev->nuv) | PROTO_UV_PARENT;
-      /* and install in the parent */
-      fs->prev->uvmap[fs->prev->nuv++] = const_gc(fs->prev, obj2gco(pt), LJ_TPROTO) | PROTO_UV_CLOSURE;
-      fs_lift_check(fs->prev, pt);
+  uint16_t *uv = proto_uv(pt);
+  MSize i, n = pt->sizeuv;
+  for (i = 0; i < n; i++) {
+    VarIndex vidx = uv[i];
+    /* Child uv pointing to our local. Mark immutable if no writes were observed. */
+    if (vidx <= PROTO_UV_MASK) {
+      uint16_t immu = ((!(vstack[vidx].info & VSTACK_VAR_RW))*PROTO_UV_IMMUTABLE);
+      uv[i] = vstack[vidx].slot | immu;
     }
-
-    /* Propagate immutable flag */
-    if (!(pt->flags & PROTO_LIFTED))
-      for (j = 0; j < pt->sizeuv; j++)
-        if (uv[j] < PROTO_UV_MASK)
-          uv[j] |= (!(vstack[fs->varmap[uv[j]]].info & VSTACK_VAR_RW)) * PROTO_UV_IMMUTABLE;
-  } /* table */
+  }
 }
 
 /* Fixup constants for prototype. */
@@ -1487,19 +1421,70 @@ static void fs_fixup_k(FuncState *fs, GCproto *pt, void *kptr)
 	GCobj *o = gcV(&n->key);
 	setgcref(((GCRef *)kptr)[~kidx], o);
 	lj_gc_objbarrier(fs->L, pt, o);
+	if (tvisproto(&n->key))
+	  fs_fixup_uv2(fs, gco2pt(o));
       }
     }
   }
 }
 
-/* Copy upvalues, and potentially resolve it if not lifted */
-static void fs_fixup_uv(FuncState *fs, GCproto *pt, uint16_t *uv)
+/* Attempt to lift closures to upper scopes. */
+static void fs_fixup_uv1(FuncState *fs, GCproto *pt, uint16_t *uv)
 {
+  int i;
+  uint16_t puv[LJ_MAX_UPVAL];
+  FuncState *t,*p = fs;
+  int nuv = fs->nuv;
+
   setmref(pt->uv, uv);
   pt->sizeuv = fs->nuv;
-  memcpy(uv, fs->uvmap, fs->nuv*sizeof(VarIndex));
-  if (!(pt->flags & PROTO_LIFTED))
-    fs_fixup_uv1(fs->prev, pt);
+  memcpy(uv, fs->uvval, fs->nuv*sizeof(VarIndex));
+
+  if (!(L2J(fs->ls->L)->flags & JIT_F_OPT_LLIFT))
+    return;
+
+  
+  while (p->prev &&
+      p->prev->prev /* TBD: Solve xpcall/coroutine regression when p->prev has lifted closure */
+      ) {
+    /* check */
+    for (i = 0; i < nuv; i++) {
+      if ((uv[i] != PROTO_UV_HOLE) && ((!(uv[i] & PROTO_UV_CHAINED)) && (p->uvcount[i])))
+        goto stop;
+    }
+
+    /* resolve */
+    memcpy(puv, uv, fs->nuv*sizeof(VarIndex));
+    for (i = 0; i < nuv; i++) {
+      if (p->uvcount[i] == 0)
+        uv[i] = PROTO_UV_HOLE;
+      if (uv[i] == PROTO_UV_HOLE)
+        continue;
+      if (uv[i] & PROTO_UV_CHAINED) {
+        p->uvcount[i]--;
+        uv[i] = p->prev->uvval[i];
+      } else {
+        lua_assert(0);
+      }
+    }
+    p = p->prev;
+  }
+stop:;
+  /* Lifted? */
+  if (p != fs) {
+    /* Create uv chain. */
+    for (t = fs->prev; t != p; t = t->prev) {
+      t->uvcount[t->nuv] = 1;
+      t->uvmap[t->nuv] = LJ_MAX_VSTACK;
+      t->uvval[t->nuv++] = t->prev->nuv | PROTO_UV_CHAINED;
+    }
+    /* And install the closure. */
+    t->uvval[t->nuv] = const_gc(t, obj2gco(pt), LJ_TPROTO) | PROTO_UV_CLOSURE;
+    t->uvmap[t->nuv] = LJ_MAX_VSTACK;
+    t->uvcount[t->nuv++] = 1;
+    fs->flags = PROTO_LIFTED;
+    memcpy(uv, puv, fs->nuv*sizeof(VarIndex));
+  }
 }
 
 #ifndef LUAJIT_DISABLE_DEBUGINFO
@@ -1673,7 +1658,6 @@ static GCproto *fs_finish(LexState *ls, BCLine line)
 
   /* Apply final fixups. */
   fs_fixup_ret(fs);
-  fs_fixup_uv2(fs);
 
   /* Calculate total size of prototype including all colocated arrays. */
   sizept = sizeof(GCproto) + fs->pc*sizeof(BCIns) + fs->nkgc*sizeof(GCRef);
@@ -1688,8 +1672,7 @@ static GCproto *fs_finish(LexState *ls, BCLine line)
   pt->gct = ~LJ_TPROTO;
   pt->sizept = (MSize)sizept;
   pt->trace = 0;
-  /* PROTO_LIFTED will be cleared in uv2 */
-  pt->flags = (uint8_t)(fs->flags & ~(PROTO_HAS_RETURN|PROTO_FIXUP_RETURN));
+  pt->flags = (uint8_t)(fs->flags & ~(PROTO_HAS_RETURN|PROTO_FIXUP_RETURN|PROTO_LIFTED));
   pt->numparams = fs->numparams;
   pt->framesize = fs->framesize;
   setgcref(pt->chunkname, obj2gco(ls->chunkname));
@@ -1698,7 +1681,7 @@ static GCproto *fs_finish(LexState *ls, BCLine line)
   *(uint32_t *)((char *)pt + ofsk - sizeof(GCRef)*(fs->nkgc+1)) = 0;
   fs_fixup_bc(fs, pt, (BCIns *)((char *)pt + sizeof(GCproto)), fs->pc);
   fs_fixup_k(fs, pt, (void *)((char *)pt + ofsk));
-  fs_fixup_uv(fs, pt, (uint16_t *)((char *)pt + ofsuv));
+  fs_fixup_uv1(fs, pt, (uint16_t *)((char *)pt + ofsuv));
   fs_fixup_line(fs, pt, (void *)((char *)pt + ofsli), numline);
   fs_fixup_var(ls, pt, (uint8_t *)((char *)pt + ofsdbg), ofsvar);
 
@@ -1717,7 +1700,7 @@ static GCproto *fs_finish(LexState *ls, BCLine line)
 static void fs_init(LexState *ls, FuncState *fs)
 {
   lua_State *L = ls->L;
-  memset(fs->uvmap, 0xff, sizeof fs->uvmap);
+  memset(fs->uvcount, 0, sizeof(fs->uvcount));
   fs->prev = ls->fs; ls->fs = fs;  /* Append to list. */
   fs->ls = ls;
   fs->vbase = ls->vtop;
@@ -1732,8 +1715,7 @@ static void fs_init(LexState *ls, FuncState *fs)
   fs->nuv = 0;
   fs->bl = NULL;
   fs->flags = 0;
-  if (fs->prev && (L2J(L)->flags & JIT_F_OPT_LLIFT))
-    fs->flags = PROTO_LIFTED; /* Attempt to lift the closure */
+  fs->flags = 0;
   fs->framesize = 1;  /* Minimum frame size. */
   fs->kt = lj_tab_new(L, 0, 0);
 
@@ -1982,11 +1964,8 @@ static void parse_body(LexState *ls, ExpDesc *e, int needself, BCLine line)
   if (!(fs.flags & PROTO_LIFTED)) {
     expr_init(e, VRELOCABLE,
 	    bcemit_AD(pfs, BC_FNEW, 0, const_gc(pfs, obj2gco(pt), LJ_TPROTO)));
-  } else { /* The closure has been lifted. */
-    int j;
-    pfs->uvmap[pfs->nuv] = const_gc(pfs, obj2gco(pt), LJ_TPROTO) | PROTO_UV_CLOSURE;
-    expr_init(e, VRELOCABLE, bcemit_AD(pfs, BC_UGET, 0, pfs->nuv++));
-    fs_lift_check(pfs, pt);
+  } else { 
+    expr_init(e, VRELOCABLE, bcemit_AD(pfs, BC_UGET, 0, pfs->nuv-1));
   }
 #if LJ_HASFFI
   pfs->flags |= (fs.flags & PROTO_FFI);
@@ -2620,7 +2599,7 @@ static void parse_for_num(LexState *ls, GCstr *varname, BCLine line)
 static int predict_next(LexState *ls, FuncState *fs, BCPos pc)
 {
   BCIns ins = fs->bcbase[pc].ins;
-  VarIndex idx;
+  int idx;
   GCstr *name;
   cTValue *o;
   switch (bc_op(ins)) {
@@ -2629,7 +2608,7 @@ static int predict_next(LexState *ls, FuncState *fs, BCPos pc)
     break;
   case BC_UGET:
     idx = fs->uvmap[bc_d(ins)];
-    if (idx >= LJ_MAX_VSTACK) return 0; /* UV not associated with var */
+    if (idx == LJ_MAX_VSTACK) return 0; /* UV not associated with var */
     name = gco2str(gcref(ls->vstack[idx].name));
     break;
   case BC_GGET:
@@ -2836,14 +2815,19 @@ GCproto *lj_parse(LexState *ls)
   fs.bcbase = NULL;
   fs.bclim = 0;
   fs.flags |= PROTO_VARARG;  /* Main chunk is always a vararg func. */
+
+  /* Pretend _ENV is coming from previous virtual scope */
   ls->env = lj_parse_keepstr(ls, "_ENV", 4);
   var_new(ls, 0, ls->env);
   ls->vstack[0].startpc = 0;
   ls->vstack[0].endpc = 0;
   ls->vstack[0].slot = 0;
   ls->vstack[0].info = 0;
-  fs.uvmap[0] = LJ_MAX_VSTACK;
+  fs.uvmap[0] = 0;
+  fs.uvval[0] = PROTO_UV_ENV;
   fs.nuv++;
+  fs.vbase = 1;
+  lua_assert(ls->vtop == 1);
   fscope_begin(&fs, &bl, 0);
   bcemit_AD(&fs, BC_FUNCV, 0, 0);  /* Placeholder. */
   lj_lex_next(ls);  /* Read-ahead first token. */

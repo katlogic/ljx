@@ -135,11 +135,12 @@ static GCfunc *func_newL(lua_State *L, GCproto *pt, GCtab *env)
   return fn;
 }
 
+static GCfunc *lj_func_newL(lua_State *L, GCproto *pt, GCfuncL *parent);
 /* Recursively instantiate closures */
 static inline
-void lj_func_init_closure(lua_State *L, uintptr_t i, GCproto *parentpt, GCfuncL *parent, GCupval *uv)
+void lj_func_init_closure(lua_State *L, uintptr_t i, GCproto *pttab, GCfuncL *parent, GCupval *uv)
 {
-  setfuncV(L, &uv->tv, lj_func_newL_gc(L, &proto_kgc(parentpt, (~i))->pt, parent));
+  setfuncV(L, &uv->tv, lj_func_newL(L, &proto_kgc(pttab, (~i))->pt, parent));
 }
 
 /* Create a new Lua function with empty upvalues. */
@@ -151,76 +152,83 @@ GCfunc *lj_func_newL_empty(lua_State *L, GCproto *pt, GCtab *env)
   for (i = 0; i < nuv; i++) {
     GCupval *uv = func_emptyuv(L);
     uint32_t v = proto_uv(pt)[i];
-    uv->flags = (v >> PROTO_UV_SHIFT); /* XXX maybe only UV_ENV? */
+    uint8_t flags = (v >> PROTO_UV_SHIFT);
+    if (flags == UV_HOLE) {
+      setgcrefnull(fn->l.uvptr[i]);
+      continue;
+    }
+    uv->flags = flags;
     uv->dhash = (uint32_t)(uintptr_t)pt ^ ((uint32_t)proto_uv(pt)[i] << 24);
     setgcref(fn->l.uvptr[i], obj2gco(uv));
-    if (uv->flags & UV_ENV)
+    if (flags == UV_ENV) {
       settabV(L, &uv->tv, env);
-  }
-  for (i = 0; i < nuv; i++) {
-    uint16_t v = proto_uv(pt)[i];
-    if (v & PROTO_UV_CLOSURE) {
-      GCupval *uv = &gcref(fn->l.uvptr[i])->uv;
+    } else if (flags == UV_CLOSURE)
       lj_func_init_closure(L, v & PROTO_UV_MASK, pt, &fn->l, uv);
-    }
   }
   fn->l.nupvalues = (uint8_t)nuv;
   return fn;
 }
 
 /* Do a GC check and create a new Lua function with inherited upvalues. */
-GCfunc *lj_func_newL_gc(lua_State *L, GCproto *pt, GCfuncL *parent)
+static GCfunc *lj_func_newL(lua_State *L, GCproto *pt, GCfuncL *parent)
 {
   GCfunc *fn;
   GCRef *puv;
   MSize i, nuv;
   TValue *base;
-  lj_gc_check_fixtop(L);
+
   fn = func_newL(L, pt, tabref(parent->env));
   /* NOBARRIER: The GCfunc is new (marked white). */
   puv = parent->uvptr;
   nuv = pt->sizeuv;
   base = L->base;
-  fn->l.nupvalues = (uint8_t)nuv;
+
+  fn->l.nupvalues = 0;
   for (i = 0; i < nuv; i++) {
     uint32_t v = proto_uv(pt)[i];
     GCupval *uv;
-    /* Closure UV */
-    if (v & PROTO_UV_CLOSURE) {
-      uv = func_emptyuv(L);
-      uv->flags = v >> PROTO_UV_SHIFT;
-      setgcref(fn->l.uvptr[i], obj2gco(uv));
-      continue;
-    /* Inherited from parent */
-    } else if (v & PROTO_UV_PARENT) {
-      uv = &gcref(puv[v & PROTO_UV_MASK])->uv;
-      lua_assert(uv);
-      /* And global _ENV? */
-      if (uv->flags & UV_ENV) {
-        setgcref(fn->l.next_ENV, obj2gco(parent));
-        fn->l.prev_ENV = parent->prev_ENV;
-        setgcref(gcref(fn->l.prev_ENV)->fn.l.next_ENV, obj2gco(fn));
-        setgcref(parent->prev_ENV, obj2gco(fn));
-      }
-    /* Otherwise new local UV */
-    } else {
-      uv = func_finduv(L, base + (v & 0xff));
-      uv->flags = v >> PROTO_UV_SHIFT;
-      uv->dhash = (uint32_t)(uintptr_t)mref(parent->pc, char) ^ (v << 24);
+    switch (v >> PROTO_UV_SHIFT) {
+      case UV_CLOSURE:
+        uv = func_emptyuv(L);
+        uv->flags = v >> PROTO_UV_SHIFT;
+        setgcref(fn->l.uvptr[i], obj2gco(uv));
+        lj_func_init_closure(L, v & PROTO_UV_MASK, pt, &fn->l, uv);
+        break;
+      case UV_ENV:
+        //lua_assert(0);
+      case UV_CHAINED:
+        uv = &gcref(puv[v & PROTO_UV_MASK])->uv;
+        lua_assert(uv);
+        if (uv->flags & UV_ENV) {
+          setgcref(fn->l.next_ENV, obj2gco(parent));
+          fn->l.prev_ENV = parent->prev_ENV;
+          setgcref(gcref(fn->l.prev_ENV)->fn.l.next_ENV, obj2gco(fn));
+          setgcref(parent->prev_ENV, obj2gco(fn));
+        }
+        setgcref(fn->l.uvptr[i], obj2gco(uv));
+        break;
+      case UV_IMMUTABLE:
+      case UV_LOCAL:
+        uv = func_finduv(L, base + (v & 0xff));
+        uv->flags = v >> PROTO_UV_SHIFT;
+        uv->dhash = (uint32_t)(uintptr_t)mref(parent->pc, char) ^ (v << 24);
+        setgcref(fn->l.uvptr[i], obj2gco(uv));
+        break;
+      case UV_HOLE:
+        setgcrefnull(fn->l.uvptr[i]);
+        continue;
+      default:
+        lua_assert(0);
     }
-    setgcref(fn->l.uvptr[i], obj2gco(uv));
   }
-
-  /* Do this later as those may refer our uvs. TODO: make this faster */
-  for (i = 0; i < nuv; i++) {
-    uint32_t v = proto_uv(pt)[i];
-    if (v & PROTO_UV_CLOSURE) {
-      GCupval *uv= &gcref(fn->l.uvptr[v & PROTO_UV_MASK])->uv;
-      lj_func_init_closure(L, v & PROTO_UV_MASK, pt, &fn->l, uv);
-    }
-  }
-
+  fn->l.nupvalues = (uint8_t)nuv;
   return fn;
+}
+  
+GCfunc *lj_func_newL_gc(lua_State *L, GCproto *pt, GCfuncL *parent)
+{
+  lj_gc_check_fixtop(L);
+  return lj_func_newL(L, pt, parent);
 }
 
 void LJ_FASTCALL lj_func_free(global_State *g, GCfunc *fn)
