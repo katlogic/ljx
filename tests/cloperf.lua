@@ -17,7 +17,7 @@ local function x()
 end
 
 res=0
-for i=1,10000000 do
+for i=1,1e8 do
 	local r = x()
 	res=res+r(i)
 end
