@@ -248,9 +248,15 @@ LJLIB_CF(select)		LJLIB_REC(.)
 
 LJLIB_ASM(tonumber)		LJLIB_REC(.)
 {
-  int32_t base = lj_lib_optint(L, 2, 10);
-  if (base == 10) {
+  int32_t base = lj_lib_optint(L, 2, 0); /* TBD: 0 base is ugly, check stack for nil .. */
+
+  if (base == 0) {
     TValue *o = lj_lib_checkany(L, 1);
+#if !LJ_51
+    base = 10;
+    /* TBD: This is intentionally super ugly - implement sane strict number switching. */
+    int i; if (tvisstr(o)) for (i = 0; i < strV(o)->len; i++) if (!strdata(strV(o))[i]) goto strictnum;
+#endif
     if (lj_strscan_numberobj(o)) {
       copyTV(L, L->base-1, o);
       return FFH_RES(1);
@@ -275,7 +281,9 @@ LJLIB_ASM(tonumber)		LJLIB_REC(.)
     }
 #endif
   } else {
-    const char *p = strdata(lj_lib_checkstr(L, 1));
+strictnum:;
+    GCstr *str = lj_lib_checkstr(L, 1);
+    const char *p = strdata(str);
     char *ep;
     unsigned long ul;
     if (base < 2 || base > 36)
@@ -283,11 +291,11 @@ LJLIB_ASM(tonumber)		LJLIB_REC(.)
     ul = strtoul(p, &ep, base);
     if (p != ep) {
       while (lj_char_isspace((unsigned char)(*ep))) ep++;
-      if (*ep == '\0') {
+      if (ep == (p+str->len)) {
 	if (LJ_DUALNUM && LJ_LIKELY(ul < 0x80000000u))
 	  setintV(L->base-1, (int32_t)ul);
 	else
-	  setnumV(L->base-1, (lua_Number)ul);
+	  setnumV(L->base-1, (lua_Number)((long)ul));
 	return FFH_RES(1);
       }
     }
