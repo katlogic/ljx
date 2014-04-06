@@ -193,6 +193,7 @@ end
 -- errors in format
 
 
+
 assert(load("return 1\n--comentário sem EOL no final")() == 1)
 
 
@@ -232,8 +233,29 @@ local function trylocale (w)
   return false
 end
 
+if not trylocale("collate")  then
+  print("locale not supported")
+else
+  assert("alo" < "álo" and "álo" < "amo")
 end
 
-print('OK, but no locales')
+if not trylocale("ctype") then
+  print("locale not supported")
+else
+  assert(load("a = 3.4"));  -- parser should not change outside locale
+  assert(not load("á = 3.4"));  -- even with errors
+  assert(string.gsub("áéíóú", "%a", "x") == "xxxxx")
+  assert(string.gsub("áÁéÉ", "%l", "x") == "xÁxÉ")
+  assert(string.gsub("áÁéÉ", "%u", "x") == "áxéx")
+  assert(string.upper"áÁé{xuxu}ção" == "ÁÁÉ{XUXU}ÇÃO")
+end
+
+os.setlocale("C")
+assert(os.setlocale() == 'C')
+assert(os.setlocale(nil, "numeric") == 'C')
+
+end
+
+print('OK')
 
 
