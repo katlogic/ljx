@@ -334,6 +334,7 @@ StrScanFmt lj_strscan_scan(const uint8_t *p, TValue *o, uint32_t opt)
   if (LJ_UNLIKELY(!lj_char_isdigit(*p))) {
     while (lj_char_isspace(*p)) p++;
     if (*p == '+' || *p == '-') neg = (*p++ == '-');
+#if LJ_51
     if (LJ_UNLIKELY(*p >= 'A')) {  /* Parse "inf", "infinity" or "nan". */
       TValue tmp;
       setnanV(&tmp);
@@ -350,6 +351,7 @@ StrScanFmt lj_strscan_scan(const uint8_t *p, TValue *o, uint32_t opt)
       o->u64 = tmp.u64;
       return STRSCAN_NUM;
     }
+#endif
   }
 
   /* Parse regular number. */
