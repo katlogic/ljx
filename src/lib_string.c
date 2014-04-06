@@ -144,6 +144,7 @@ LJLIB_CF(string_dump)
 typedef struct MatchState {
   const char *src_init;  /* init of source string */
   const char *src_end;  /* end (`\0') of source string */
+  const char *p_end; /* end ('\0') of pattern */
   lua_State *L;
   int level;  /* total number of captures (finished or unfinished) */
   int depth;
@@ -176,15 +177,15 @@ static const char *classend(MatchState *ms, const char *p)
 {
   switch (*p++) {
   case L_ESC:
-    if (*p == '\0')
+    if (p == ms->p_end)
       lj_err_caller(ms->L, LJ_ERR_STRPATE);
     return p+1;
   case '[':
     if (*p == '^') p++;
     do {  /* look for a `]' */
-      if (*p == '\0')
+      if (p == ms->p_end)
 	lj_err_caller(ms->L, LJ_ERR_STRPATM);
-      if (*(p++) == L_ESC && *p != '\0')
+      if (*(p++) == L_ESC && p < ms->p_end)
 	p++;  /* skip escapes (e.g. `%]') */
     } while (*p != ']');
     return p+1;
@@ -236,8 +237,11 @@ static int matchbracketclass(int c, const char *p, const char *ec)
   return !sig;
 }
 
-static int singlematch(int c, const char *p, const char *ep)
+static int singlematch(MatchState *ms, const char *s, const char *p, const char *ep)
 {
+  int c = uchar(*s);
+  if (s >= ms->src_end)
+    return 0;
   switch (*p) {
   case '.': return 1;  /* matches any char */
   case L_ESC: return match_class(c, uchar(*(p+1)));
@@ -250,7 +254,7 @@ static const char *match(MatchState *ms, const char *s, const char *p);
 
 static const char *matchbalance(MatchState *ms, const char *s, const char *p)
 {
-  if (*p == 0 || *(p+1) == 0)
+  if (p >= ms->p_end - 1)
     lj_err_caller(ms->L, LJ_ERR_STRPATU);
   if (*s != *p) {
     return NULL;
@@ -273,7 +277,7 @@ static const char *max_expand(MatchState *ms, const char *s,
 			      const char *p, const char *ep)
 {
   ptrdiff_t i = 0;  /* counts maximum expand for item */
-  while ((s+i)<ms->src_end && singlematch(uchar(*(s+i)), p, ep))
+  while (singlematch(ms, s+i, p, ep))
     i++;
   /* keeps trying to match with the maximum repetitions */
   while (i>=0) {
@@ -291,7 +295,7 @@ static const char *min_expand(MatchState *ms, const char *s,
     const char *res = match(ms, s, ep+1);
     if (res != NULL)
       return res;
-    else if (s<ms->src_end && singlematch(uchar(*s), p, ep))
+    else if (singlematch(ms, s, p, ep))
       s++;  /* try with one more repetition */
     else
       return NULL;
@@ -340,7 +344,7 @@ static const char *match(MatchState *ms, const char *s, const char *p)
   if (++ms->depth > LJ_MAX_XLEVEL)
     lj_err_caller(ms->L, LJ_ERR_STRPATX);
   init: /* using goto's to optimize tail recursion */
-  switch (*p) {
+  if (p != ms->p_end) switch (*p) {
   case '(':  /* start capture */
     if (*(p+1) == ')')  /* position capture? */
       s = start_capture(ms, s, p+2, CAP_POSITION);
@@ -379,16 +383,15 @@ static const char *match(MatchState *ms, const char *s, const char *p)
       goto dflt;  /* case default */
     }
     break;
-  case '\0':  /* end of pattern */
-    break;  /* match succeeded */
   case '$':
     /* is the `$' the last char in pattern? */
-    if (*(p+1) != '\0') goto dflt;
+    if ((p + 1) != ms->p_end)
+      goto dflt;
     if (s != ms->src_end) s = NULL;  /* check end of string */
     break;
   default: dflt: {  /* it is a pattern item */
     const char *ep = classend(ms, p);  /* points to what is next */
-    int m = s<ms->src_end && singlematch(uchar(*s), p, ep);
+    int m = singlematch(ms, s, p, ep);
     switch (*ep) {
     case '?': {  /* optional */
       const char *res;
@@ -477,6 +480,7 @@ static int str_find_aux(lua_State *L, int find)
     ms.L = L;
     ms.src_init = strdata(s);
     ms.src_end = strdata(s) + s->len;
+    ms.p_end = pstr + p->len - anchor;
     do {  /* Loop through string and try to match the pattern. */
       const char *q;
       ms.level = ms.depth = 0;
@@ -508,15 +512,17 @@ LJLIB_CF(string_match)
 
 LJLIB_NOREG LJLIB_CF(string_gmatch_aux)
 {
-  const char *p = strVdata(lj_lib_upvalue(L, 2));
+  GCstr *pstr = strV(lj_lib_upvalue(L, 2));
   GCstr *str = strV(lj_lib_upvalue(L, 1));
   const char *s = strdata(str);
+  const char *p = strdata(pstr);
   TValue *tvpos = lj_lib_upvalue(L, 3);
   const char *src = s + tvpos->u32.lo;
   MatchState ms;
   ms.L = L;
   ms.src_init = s;
   ms.src_end = s + str->len;
+  ms.p_end = p + pstr->len;
   for (; src <= ms.src_end; src++) {
     const char *e;
     ms.level = ms.depth = 0;
@@ -595,9 +601,9 @@ static void add_value(MatchState *ms, luaL_Buffer *b,
 
 LJLIB_CF(string_gsub)
 {
-  size_t srcl;
+  size_t srcl, pl;
   const char *src = luaL_checklstring(L, 1, &srcl);
-  const char *p = luaL_checkstring(L, 2);
+  const char *p = luaL_checklstring(L, 2, &pl);
   int  tr = lua_type(L, 3);
   int max_s = luaL_optint(L, 4, (int)(srcl+1));
   int anchor = (*p == '^') ? (p++, 1) : 0;
@@ -611,6 +617,7 @@ LJLIB_CF(string_gsub)
   ms.L = L;
   ms.src_init = src;
   ms.src_end = src+srcl;
+  ms.p_end = p+pl-anchor;
   while (n < max_s) {
     const char *e;
     ms.level = ms.depth = 0;
