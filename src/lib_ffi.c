@@ -673,6 +673,21 @@ LJLIB_CF(ffi_string)	LJLIB_REC(.)
   return 1;
 }
 
+/* Pointer to GCstr followed by string contents is expected. */
+LJLIB_CF(ffi_strbuf)	LJLIB_REC(.)
+{
+  GCstr *s = ffi_checkptr(L, 1, CTID_P_CVOID);
+  TValue *o = L->top-1;
+  /* Caller is responsible for passing pointer fitting into 32 bits. */
+  lua_assert(((ptrdiff_t)s) <= 0xffffffff);
+  s->marked = LJ_GC_FIXED | LJ_GC_SFIXED;
+  s->gct = ~LJ_TSTR;
+  setgcrefnull(obj2gco(s)->gch.nextgc);
+  setstrV(L, o, s);
+  setitype(o, LJ_TSTR);
+  return 1;
+}
+
 LJLIB_CF(ffi_copy)	LJLIB_REC(.)
 {
   void *dp = ffi_checkptr(L, 1, CTID_P_VOID);

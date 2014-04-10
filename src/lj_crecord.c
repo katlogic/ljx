@@ -1566,6 +1566,20 @@ void LJ_FASTCALL recff_ffi_string(jit_State *J, RecordFFData *rd)
   }  /* else: interpreter will throw. */
 }
 
+void LJ_FASTCALL recff_ffi_strbuf(jit_State *J, RecordFFData *rd)
+{
+  CTState *cts = ctype_ctsG(J2G(J));
+  TRef dst, tr = J->base[0];
+  if (tr) {
+    dst = crec_ct_tv(J, ctype_get(cts, CTID_P_VOID), 0, tr, &rd->argv[0]);
+    /* TBD: big endian */
+    TRef hdr = lj_ir_kint64(J, ((0L|LJ_GC_SFIXED|LJ_GC_FIXED)<<32) +
+        ((0L+(~LJ_TSTR))<<40));
+    emitir(IRT(IR_XSTORE, IRT_U64), dst, hdr);
+    J->base[0] = emitconv(dst, IRT_STR, IRT_PTR, 0);
+  }
+}
+
 void LJ_FASTCALL recff_ffi_copy(jit_State *J, RecordFFData *rd)
 {
   CTState *cts = ctype_ctsG(J2G(J));
