@@ -141,19 +141,6 @@ LJLIB_CF(string_dump)
 #define CAP_UNFINISHED	(-1)
 #define CAP_POSITION	(-2)
 
-typedef struct MatchState {
-  const char *src_init;  /* init of source string */
-  const char *src_end;  /* end (`\0') of source string */
-  const char *p_end; /* end ('\0') of pattern */
-  lua_State *L;
-  int level;  /* total number of captures (finished or unfinished) */
-  int depth;
-  struct {
-    const char *init;
-    ptrdiff_t len;
-  } capture[LUA_MAXCAPTURES];
-} MatchState;
-
 #define L_ESC		'%'
 
 static int check_capture(MatchState *ms, int l)
@@ -308,11 +295,13 @@ static const char *start_capture(MatchState *ms, const char *s,
   const char *res;
   int level = ms->level;
   if (level >= LUA_MAXCAPTURES) lj_err_caller(ms->L, LJ_ERR_STRCAPN);
-  ms->capture[level].init = s;
+  setmref(ms->capture[level].init, s);
   ms->capture[level].len = what;
   ms->level = level+1;
-  if ((res=match(ms, s, p)) == NULL)  /* match failed? */
+  if ((res=match(ms, s, p)) == NULL)  /* match failed? */ {
+    lua_assert(ms->level);
     ms->level--;  /* undo capture */
+  }
   return res;
 }
 
@@ -321,7 +310,7 @@ static const char *end_capture(MatchState *ms, const char *s,
 {
   int l = capture_to_close(ms);
   const char *res;
-  ms->capture[l].len = s - ms->capture[l].init;  /* close capture */
+  ms->capture[l].len = s - mref(ms->capture[l].init, char);  /* close capture */
   if ((res = match(ms, s, p)) == NULL)  /* match failed? */
     ms->capture[l].len = CAP_UNFINISHED;  /* undo capture */
   return res;
@@ -333,7 +322,7 @@ static const char *match_capture(MatchState *ms, const char *s, int l)
   l = check_capture(ms, l);
   len = (size_t)ms->capture[l].len;
   if ((size_t)(ms->src_end-s) >= len &&
-      memcmp(ms->capture[l].init, s, len) == 0)
+      memcmp(mref(ms->capture[l].init, char), s, len) == 0)
     return s+len;
   else
     return NULL;
@@ -426,6 +415,7 @@ static const char *match(MatchState *ms, const char *s, const char *p)
 static void push_onecapture(MatchState *ms, int i, const char *s, const char *e)
 {
   if (i >= ms->level) {
+    lua_assert(ms->level>=0);
     if (i == 0)  /* ms->level == 0, too */
       lua_pushlstring(ms->L, s, (size_t)(e - s));  /* add whole match */
     else
@@ -434,9 +424,9 @@ static void push_onecapture(MatchState *ms, int i, const char *s, const char *e)
     ptrdiff_t l = ms->capture[i].len;
     if (l == CAP_UNFINISHED) lj_err_caller(ms->L, LJ_ERR_STRCAPU);
     if (l == CAP_POSITION)
-      lua_pushinteger(ms->L, ms->capture[i].init - ms->src_init + 1);
+      lua_pushinteger(ms->L, mref(ms->capture[i].init, char) - ms->src_init + 1);
     else
-      lua_pushlstring(ms->L, ms->capture[i].init, (size_t)l);
+      lua_pushlstring(ms->L, mref(ms->capture[i].init, char), (size_t)l);
   }
 }
 
@@ -444,10 +434,49 @@ static int push_captures(MatchState *ms, const char *s, const char *e)
 {
   int i;
   int nlevels = (ms->level == 0 && s) ? 1 : ms->level;
+  lua_assert(nlevels >= 0);
   luaL_checkstack(ms->L, nlevels, "too many captures");
   for (i = 0; i < nlevels; i++)
     push_onecapture(ms, i, s, e);
   return nlevels;  /* number of strings pushed */
+}
+
+/* Perform match and store result in global state for FFI mcode to pick up. */
+MatchState * ljx_str_match(lua_State *L, const char *s, const char *p, MSize slen, MSize plen, int32_t start)
+{
+  MatchState *ms = &G(L)->ms;
+  int anchor = 0;
+  MSize st;
+  const char *sstr;
+  if (start < 0) start += (int32_t)slen; else start--;
+  if (start < 0) start = 0;
+  st = start;
+  if (st > slen)
+    return NULL;
+  sstr = s + start;
+  if (*p == '^') { p++; anchor = 1; }
+  ms->L = L;
+  ms->src_init = s;
+  ms->src_end = s + slen;
+  ms->p_end = p + plen - anchor;
+  do {  /* Loop through string and try to match the pattern. */
+    const char *q;
+    ms->level = ms->depth = 0;
+    q = match(ms, sstr, p);
+    if (q) {
+      /* No capture - simulate one return capture. */
+      lua_assert(sstr>s);
+      lua_assert(q>=s);
+      ms->findret1 = (int32_t)(sstr-s-1);
+      ms->findret2 = (int32_t)(q-s);
+      if (!ms->level) {
+        setmref(ms->capture[0].init, s);
+        ms->capture[0].len = q - s;
+      }
+      return ms;
+    }
+  } while (!anchor && (sstr++ < ms->src_end));
+  return NULL;
 }
 
 static int str_find_aux(lua_State *L, int find)
@@ -456,26 +485,30 @@ static int str_find_aux(lua_State *L, int find)
   GCstr *p = lj_lib_checkstr(L, 2);
   int32_t start = lj_lib_optint(L, 3, 1);
   MSize st;
-  if (start < 0) start += (int32_t)s->len; else start--;
-  if (start < 0) start = 0;
-  st = (MSize)start;
-  if (st > s->len) {
-    setnilV(L->top-1);
-    return 1;
-  }
+  MatchState ms;
+  const char *pstr;
+  const char *sstr;
+  int anchor;
+
   if (find && ((L->base+3 < L->top && tvistruecond(L->base+3)) ||
 	       !lj_str_haspattern(p))) {  /* Search for fixed string. */
-    const char *q = lj_str_find(strdata(s)+st, strdata(p), s->len-st, p->len);
-    if (q) {
-      setintV(L->top-2, (int32_t)(q-strdata(s)) + 1);
-      setintV(L->top-1, (int32_t)(q-strdata(s)) + (int32_t)p->len);
+    int n = lj_str_find(strdata(s), strdata(p), s->len, p->len, start);
+    if (n) {
+      setintV(L->top-2, n);
+      setintV(L->top-1, n+p->len-1);
       return 2;
     }
   } else {  /* Search for pattern. */
-    MatchState ms;
-    const char *pstr = strdata(p);
-    const char *sstr = strdata(s) + st;
-    int anchor = 0;
+    if (start < 0) start += (int32_t)s->len; else start--;
+    if (start < 0) start = 0;
+    st = (MSize)start;
+    if (st > s->len) {
+      setnilV(L->top-1);
+      return 1;
+    }
+    pstr = strdata(p);
+    sstr = strdata(s) + st;
+    anchor = 0;
     if (*pstr == '^') { pstr++; anchor = 1; }
     ms.L = L;
     ms.src_init = strdata(s);
@@ -505,7 +538,7 @@ LJLIB_CF(string_find)		LJLIB_REC(.)
   return str_find_aux(L, 1);
 }
 
-LJLIB_CF(string_match)
+LJLIB_CF(string_match)          LJLIB_REC(.)
 {
   return str_find_aux(L, 0);
 }

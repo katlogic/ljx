@@ -894,17 +894,36 @@ static void LJ_FASTCALL recff_string_op(jit_State *J, RecordFFData *rd)
   J->base[0] = emitir(IRT(IR_BUFSTR, IRT_STR), tr, hdr);
 }
 
+static int ms_captures(jit_State *J, const MatchState *ms, TRef tr)
+{
+  int i;
+  if (ms->level) {
+    TRef captures = emitir(IRT(IR_ADD, IRT_P32), tr, offsetof(MatchState, capture));
+    for (i = 0; i < ms->level; i++) {
+      J->base[2+i] = emitir(IRT(IR_SNEW, IRT_STR), 
+          emitir(IRT(IR_XLOAD, IRT_P32), emitir(IRT(IR_ADD, IRT_U32), captures, lj_ir_kint(J, i*8)), 0),
+          emitir(IRT(IR_XLOAD, IRT_U32), emitir(IRT(IR_ADD, IRT_U32), captures, lj_ir_kint(J, i*8+4)), 0)
+          ); /* SNEW */
+    }
+  }
+  return ms->level;
+}
+
 static void LJ_FASTCALL recff_string_find(jit_State *J, RecordFFData *rd)
 {
-  TRef trstr = lj_ir_tostr(J, J->base[0]);
-  TRef trpat = lj_ir_tostr(J, J->base[1]);
-  TRef trlen = emitir(IRTI(IR_FLOAD), trstr, IRFL_STR_LEN);
-  TRef tr0 = lj_ir_kint(J, 0);
+  TRef tr0, trstr, trsptr, trslen, trpat;
   TRef trstart;
+  int32_t start;
   GCstr *str = argv2str(J, &rd->argv[0]);
   GCstr *pat = argv2str(J, &rd->argv[1]);
-  int32_t start;
+  TRef kpat = 0;
+
   J->needsnap = 1;
+
+  tr0 = lj_ir_kint(J, 0);
+  trstr = lj_ir_tostr(J, J->base[0]);
+  trpat = lj_ir_tostr(J, J->base[1]);
+  /* Optional start argument. */
   if (tref_isnil(J->base[2])) {
     trstart = lj_ir_kint(J, 1);
     start = 1;
@@ -912,41 +931,115 @@ static void LJ_FASTCALL recff_string_find(jit_State *J, RecordFFData *rd)
     trstart = lj_opt_narrow_toint(J, J->base[2]);
     start = argv2int(J, &rd->argv[2]);
   }
-  trstart = recff_string_start(J, str, &start, trstart, trlen, tr0);
-  if ((MSize)start <= str->len) {
-    emitir(IRTGI(IR_ULE), trstart, trlen);
-  } else {
-    emitir(IRTGI(IR_UGT), trstart, trlen);
-    J->base[0] = TREF_NIL;
-    return;
-  }
-  /* Fixed arg or no pattern matching chars? (Specialized to pattern string.) */
+  trsptr = emitir(IRT(IR_STRREF, IRT_P32), trstr, trstart);
+  trslen = emitir(IRTI(IR_FLOAD), trstr, IRFL_STR_LEN);
+
+
+  /* Specialize on pattern if no raw flag is specified. */
   if ((J->base[2] && tref_istruecond(J->base[3])) ||
-      (emitir(IRTG(IR_EQ, IRT_STR), trpat, lj_ir_kstr(J, pat)),
+      (emitir(IRTG(IR_EQ, IRT_STR), trpat, kpat = lj_ir_kstr(J, pat)),
        !lj_str_haspattern(pat))) {  /* Search for fixed string. */
-    TRef trsptr = emitir(IRT(IR_STRREF, IRT_P32), trstr, trstart);
-    TRef trpptr = emitir(IRT(IR_STRREF, IRT_P32), trpat, tr0);
-    TRef trslen = emitir(IRTI(IR_SUB), trlen, trstart);
+    TRef trpat = kpat?kpat:lj_ir_tostr(J, J->base[0]);
     TRef trplen = emitir(IRTI(IR_FLOAD), trpat, IRFL_STR_LEN);
-    TRef tr = lj_ir_call(J, IRCALL_lj_str_find, trsptr, trpptr, trslen, trplen);
-    TRef trp0 = lj_ir_kkptr(J, NULL);
-    if (lj_str_find(strdata(str)+(MSize)start, strdata(pat),
-		    str->len-(MSize)start, pat->len)) {
-      TRef pos;
-      emitir(IRTG(IR_NE, IRT_P32), tr, trp0);
-      pos = emitir(IRTI(IR_SUB), tr, emitir(IRT(IR_STRREF, IRT_P32), trstr, tr0));
-      J->base[0] = emitir(IRTI(IR_ADD), pos, lj_ir_kint(J, 1));
-      J->base[1] = emitir(IRTI(IR_ADD), pos, trplen);
+    TRef trpptr = emitir(IRT(IR_STRREF, IRT_P32), trpat, tr0);
+    TRef tr = lj_ir_call(J, IRCALL_lj_str_find, trsptr, trpptr, trslen, trplen, trstart);
+    TRef tr1 = lj_ir_kint(J, 1);
+    if (lj_str_find(strdata(str), strdata(pat),
+		    str->len, pat->len, start)) {
+      emitir(IRTG(IR_NE, IRT_INT), tr, tr0);
+      J->base[0] = tr;
+      /* Invariant: "" pattern is never valid */
+      J->base[1] = emitir(IRTI(IR_ADD), tr, emitir(IRTI(IR_SUB), trplen, tr1));
       rd->nres = 2;
+    } else {
+      emitir(IRTG(IR_EQ, IRT_INT), tr, tr0);
+      J->base[0] = TREF_NIL;
+    }
+  } else { /* Otherwise we have pattern */
+    lua_assert(kpat);
+    TRef trpat = kpat;
+    TRef trplen = emitir(IRTI(IR_FLOAD), trpat, IRFL_STR_LEN);
+    TRef trpptr = emitir(IRT(IR_STRREF, IRT_P32), trpat, tr0);
+    TRef tr = lj_ir_call(J, IRCALL_ljx_str_match, trsptr, trpptr, trslen, trplen, trstart);
+    TRef trp0 = lj_ir_kkptr(J, NULL);
+    MatchState *ms = ljx_str_match(J->L, strdata(str), strdata(pat),
+		    str->len, pat->len, start);
+    if (ms) {
+      emitir(IRTG(IR_NE, IRT_P32), tr, trp0);
+      J->base[0] = emitir(IRT(IR_FLOAD, IRT_U32), tr, IRFL_MS_FINDRET1);
+      J->base[1] = emitir(IRT(IR_FLOAD, IRT_U32), tr, IRFL_MS_FINDRET2);
+      /* If the match succeeds, number of results is always same. */
+      rd->nres = 2 + ms_captures(J, ms, tr);
     } else {
       emitir(IRTG(IR_EQ, IRT_P32), tr, trp0);
       J->base[0] = TREF_NIL;
     }
-  } else {  /* Search for pattern. */
-    recff_nyiu(J, rd);
-    return;
   }
 }
+
+/* TBD: perhaps unify with recff_string_find somehow */
+static void LJ_FASTCALL recff_string_match(jit_State *J, RecordFFData *rd)
+{
+  TRef tr0, trstr, trsptr, trslen, trpat, trplen, trpptr;
+  TRef trstart;
+  int32_t start;
+  GCstr *str = argv2str(J, &rd->argv[0]);
+  GCstr *pat = argv2str(J, &rd->argv[1]);
+  TRef kpat = 0;
+
+  J->needsnap = 1;
+
+  tr0 = lj_ir_kint(J, 0);
+  trstr = lj_ir_tostr(J, J->base[0]);
+  trpat = lj_ir_tostr(J, J->base[1]);
+  /* Optional start argument. */
+  if (tref_isnil(J->base[2])) {
+    trstart = lj_ir_kint(J, 1);
+    start = 1;
+  } else {
+    trstart = lj_opt_narrow_toint(J, J->base[2]);
+    start = argv2int(J, &rd->argv[2]);
+  }
+  trsptr = emitir(IRT(IR_STRREF, IRT_P32), trstr, trstart);
+  trslen = emitir(IRTI(IR_FLOAD), trstr, IRFL_STR_LEN);
+
+
+  kpat = lj_ir_kstr(J, pat);
+  emitir(IRTG(IR_EQ, IRT_STR), trpat, kpat);
+  trpat = kpat;
+  trplen = emitir(IRTI(IR_FLOAD), trpat, IRFL_STR_LEN);
+  trpptr = emitir(IRT(IR_STRREF, IRT_P32), trpat, tr0);
+  /* Specialize on pattern */
+  if (!lj_str_haspattern(pat)) {  /* Search for fixed string. */
+    TRef trplen = emitir(IRTI(IR_FLOAD), trpat, IRFL_STR_LEN);
+    TRef trpptr = emitir(IRT(IR_STRREF, IRT_P32), trpat, tr0);
+    TRef tr = lj_ir_call(J, IRCALL_lj_str_find, trsptr, trpptr, trslen, trplen, trstart);
+    if (lj_str_find(strdata(str), strdata(pat),
+		    str->len, pat->len, start)) {
+      emitir(IRTG(IR_NE, IRT_INT), tr, tr0);
+      J->base[0] = kpat; /* This is a bit silly. */
+    } else {
+      emitir(IRTG(IR_EQ, IRT_INT), tr, tr0);
+      J->base[0] = TREF_NIL;
+    }
+  } else { /* Otherwise we have pattern */
+    TRef tr = lj_ir_call(J, IRCALL_ljx_str_match, trsptr, trpptr, trslen, trplen, trstart);
+    TRef trp0 = lj_ir_kkptr(J, NULL);
+    MatchState *ms = ljx_str_match(J->L, strdata(str), strdata(pat),
+		    str->len, pat->len, start);
+    if (ms) {
+      emitir(IRTG(IR_NE, IRT_P32), tr, trp0);
+      /* If the match succeeds, number of results is always same. */
+      ms->level += !ms->level;
+      rd->nres = ms_captures(J, ms, tr);
+    } else {
+      emitir(IRTG(IR_EQ, IRT_P32), tr, trp0);
+      J->base[0] = TREF_NIL;
+    }
+  }
+
+}
+
 
 static void LJ_FASTCALL recff_string_format(jit_State *J, RecordFFData *rd)
 {

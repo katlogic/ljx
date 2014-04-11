@@ -127,6 +127,21 @@ typedef struct SBuf {
   MRef L;		/* lua_State, used for buffer resizing. */
 } SBuf;
 
+/* Match state for pattern captures. Directly accesed by emitted JIT code. */
+typedef struct MatchState {
+  uint32_t findret1, findret2;
+  uint32_t level;  /* total number of captures (finished or unfinished) */
+  struct {
+    MRef init;
+    MSize len;
+  } capture[LUA_MAXCAPTURES];
+  const char *src_init;  /* init of source string */
+  const char *src_end;  /* end (`\0') of source string */
+  const char *p_end; /* end ('\0') of pattern */
+  lua_State *L;
+  int depth;
+} MatchState;
+
 /* -- Tags and values ----------------------------------------------------- */
 
 /* Frame link. */
@@ -550,6 +565,7 @@ typedef struct global_State {
   MRef jit_base;	/* Current JIT code L->base or NULL. */
   MRef ctype_state;	/* Pointer to C type state. */
   GCRef gcroot[GCROOT_MAX];  /* GC roots. */
+  MatchState ms;        /* Capture buffer for JIT mcode. */
 } global_State;
 
 #define mainthread(g)	(&gcref(g->mainthref)->th)
