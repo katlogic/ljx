@@ -141,6 +141,9 @@ typedef struct MatchState {
   lua_State *L;
   int depth;
 } MatchState;
+#define CAP_UNFINISHED	((MSize)(-1))
+#define CAP_POSITION	((MSize)(-2))
+
 
 /* -- Tags and values ----------------------------------------------------- */
 
