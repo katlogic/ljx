@@ -58,24 +58,33 @@ static LJ_AINLINE int str_fastcmp(const char *a, const char *b, MSize len)
   return 0;
 }
 
-/* Find fixed string p inside string s. */
-const char *lj_str_find(const char *s, const char *p, MSize slen, MSize plen)
+/* Find fixed string p inside string s with offset start. Returns offset adjusted index. */
+uint32_t lj_str_find(const char *s, const char *p, MSize slen, MSize plen, int32_t start)
 {
+  const char *os = s;
+  if (start < 0) start += (int32_t)slen; else start--;
+  if (start < 0) start = 0;
+  if (start > slen)
+    return 0;
+
+  s += start;
+  slen -= start;
+
   if (plen <= slen) {
     if (plen == 0) {
-      return s;
+      return 0; /* Empty patterns are not allowed. */
     } else {
       int c = *(const uint8_t *)p++;
       plen--; slen -= plen;
       while (slen) {
 	const char *q = (const char *)memchr(s, c, slen);
 	if (!q) break;
-	if (memcmp(q+1, p, plen) == 0) return q;
+	if (memcmp(q+1, p, plen) == 0) return (q-os+1);
 	q++; slen -= (MSize)(q-s); s = q;
       }
     }
   }
-  return NULL;
+  return 0;
 }
 
 /* Check whether a string has a pattern matching character. */

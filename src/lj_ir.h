@@ -202,6 +202,9 @@ IRFPMDEF(FPMENUM)
   _(TAB_ASIZE,	offsetof(GCtab, asize)) \
   _(TAB_HMASK,	offsetof(GCtab, hmask)) \
   _(TAB_NOMM,	offsetof(GCtab, nomm)) \
+  _(MS_LEVEL,   offsetof(MatchState, level)) \
+  _(MS_FINDRET1,offsetof(MatchState, findret1)) \
+  _(MS_FINDRET2,offsetof(MatchState, findret2)) \
   _(UDATA_META,	offsetof(GCudata, metatable)) \
   _(UDATA_UDTYPE, offsetof(GCudata, udtype)) \
   _(UDATA_FILE,	sizeof(GCudata)) \

@@ -1577,6 +1577,7 @@ void LJ_FASTCALL recff_ffi_strbuf(jit_State *J, RecordFFData *rd)
         ((0L+(~LJ_TSTR))<<40));
     emitir(IRT(IR_XSTORE, IRT_U64), dst, hdr);
     J->base[0] = emitconv(dst, IRT_STR, IRT_PTR, 0);
+    emitir(IRT(IR_XBAR, IRT_NIL), 0, 0);
   }
 }
 
