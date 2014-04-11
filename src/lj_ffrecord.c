@@ -894,16 +894,23 @@ static void LJ_FASTCALL recff_string_op(jit_State *J, RecordFFData *rd)
   J->base[0] = emitir(IRT(IR_BUFSTR, IRT_STR), tr, hdr);
 }
 
-static int ms_captures(jit_State *J, const MatchState *ms, TRef tr)
+static int ms_captures(jit_State *J, const MatchState *ms, TRef tr, int off, TRef sptr)
 {
   int i;
   if (ms->level) {
-    TRef captures = emitir(IRT(IR_ADD, IRT_P32), tr, offsetof(MatchState, capture));
+    TRef captures = emitir(IRT(IR_ADD, IRT_P32), tr, lj_ir_kint(J, offsetof(MatchState, capture)));
     for (i = 0; i < ms->level; i++) {
-      J->base[2+i] = emitir(IRT(IR_SNEW, IRT_STR), 
-          emitir(IRT(IR_XLOAD, IRT_P32), emitir(IRT(IR_ADD, IRT_U32), captures, lj_ir_kint(J, i*8)), 0),
-          emitir(IRT(IR_XLOAD, IRT_U32), emitir(IRT(IR_ADD, IRT_U32), captures, lj_ir_kint(J, i*8+4)), 0)
-          ); /* SNEW */
+      if (ms->capture[i].len == CAP_POSITION) {
+        J->base[off+i] = 
+            emitir(IRT(IR_SUB, IRT_INT),
+                emitir(IRT(IR_XLOAD, IRT_P32), emitir(IRT(IR_ADD, IRT_P32), captures, lj_ir_kint(J, i*8)), 0),
+                emitir(IRT(IR_SUB, IRT_P32), sptr, lj_ir_kint(J, 1)));
+      } else {
+        J->base[off+i] = emitir(IRT(IR_SNEW, IRT_STR), 
+            emitir(IRT(IR_XLOAD, IRT_P32), emitir(IRT(IR_ADD, IRT_P32), captures, lj_ir_kint(J, i*8)), 0),
+            emitir(IRT(IR_XLOAD, IRT_U32), emitir(IRT(IR_ADD, IRT_P32), captures, lj_ir_kint(J, i*8+4)), 0)
+            ); /* SNEW */
+      }
     }
   }
   return ms->level;
@@ -931,7 +938,7 @@ static void LJ_FASTCALL recff_string_find(jit_State *J, RecordFFData *rd)
     trstart = lj_opt_narrow_toint(J, J->base[2]);
     start = argv2int(J, &rd->argv[2]);
   }
-  trsptr = emitir(IRT(IR_STRREF, IRT_P32), trstr, trstart);
+  trsptr = emitir(IRT(IR_STRREF, IRT_P32), trstr, tr0);
   trslen = emitir(IRTI(IR_FLOAD), trstr, IRFL_STR_LEN);
 
 
@@ -969,7 +976,7 @@ static void LJ_FASTCALL recff_string_find(jit_State *J, RecordFFData *rd)
       J->base[0] = emitir(IRT(IR_FLOAD, IRT_U32), tr, IRFL_MS_FINDRET1);
       J->base[1] = emitir(IRT(IR_FLOAD, IRT_U32), tr, IRFL_MS_FINDRET2);
       /* If the match succeeds, number of results is always same. */
-      rd->nres = 2 + ms_captures(J, ms, tr);
+      rd->nres = 2 + ms_captures(J, ms, tr, 2, trsptr);
     } else {
       emitir(IRTG(IR_EQ, IRT_P32), tr, trp0);
       J->base[0] = TREF_NIL;
@@ -1000,7 +1007,7 @@ static void LJ_FASTCALL recff_string_match(jit_State *J, RecordFFData *rd)
     trstart = lj_opt_narrow_toint(J, J->base[2]);
     start = argv2int(J, &rd->argv[2]);
   }
-  trsptr = emitir(IRT(IR_STRREF, IRT_P32), trstr, trstart);
+  trsptr = emitir(IRT(IR_STRREF, IRT_P32), trstr, tr0);
   trslen = emitir(IRTI(IR_FLOAD), trstr, IRFL_STR_LEN);
 
 
@@ -1031,7 +1038,7 @@ static void LJ_FASTCALL recff_string_match(jit_State *J, RecordFFData *rd)
       emitir(IRTG(IR_NE, IRT_P32), tr, trp0);
       /* If the match succeeds, number of results is always same. */
       ms->level += !ms->level;
-      rd->nres = ms_captures(J, ms, tr);
+      rd->nres = ms_captures(J, ms, tr, 0, trsptr);
     } else {
       emitir(IRTG(IR_EQ, IRT_P32), tr, trp0);
       J->base[0] = TREF_NIL;
