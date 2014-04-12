@@ -10,11 +10,12 @@
 # Copyright (C) 2005-2014 Mike Pall. See Copyright Notice in luajit.h
 ##############################################################################
 
-MAJVER=  2
-MINVER=  1
-RELVER=  0
-ABIVER=  5.1
-NODOTABIVER= 51
+VERSION:=$(shell git describe 2> /dev/null || cat ../.version)
+ABIVER=  5.2
+NODOTABIVER= 52
+
+# shortcut to enable common debug flags
+# DEBUG=1
 
 ##############################################################################
 #############################  COMPILER OPTIONS  #############################
@@ -34,7 +35,11 @@ CC= gcc
 # to slow down the C part by not omitting it. Debugging, tracebacks and
 # unwinding are not affected -- the assembler part has frame unwind
 # information and GCC emits it where needed (x64) or with -g (see CCDEBUG).
-CCOPT= -O2 -fomit-frame-pointer
+CCOPT= -fomit-frame-pointer
+ifeq (,$(DEBUG))
+#CCOPT+= -Os
+CCOPT+= -O2
+endif
 # Use this if you want to generate a smaller binary (but it's slower):
 #CCOPT= -Os -fomit-frame-pointer
 # Note: it's no longer recommended to use -O3 with GCC 4.x.
@@ -52,9 +57,11 @@ CCOPT_ppc=
 CCOPT_ppcspe=
 CCOPT_mips=
 #
+ifneq (,$(DEBUG))
+CCDEBUG= -g -ggdb
+else
 CCDEBUG=
-# Uncomment the next line to generate debug information:
-#CCDEBUG= -g
+endif
 #
 CCWARN= -Wall
 # Uncomment the next line to enable more warnings:
@@ -97,7 +104,7 @@ XCFLAGS=
 # enabled by default. Some other features that *might* break some existing
 # code (e.g. __pairs or os.execute() return values) can be enabled here.
 # Note: this does not provide full compatibility with Lua 5.2 at this time.
-#XCFLAGS+= -DLUAJIT_ENABLE_LUA52COMPAT
+#XCFLAGS+= -DLUAJIT_ENABLE_LUA51COMPAT
 #
 # Disable the JIT compiler, i.e. turn LuaJIT into a pure interpreter.
 #XCFLAGS+= -DLUAJIT_DISABLE_JIT
@@ -139,7 +146,11 @@ XCFLAGS=
 #
 # Turn on assertions for the whole LuaJIT VM. This significantly slows down
 # everything. Use only if you suspect a problem with LuaJIT itself.
-#XCFLAGS+= -DLUA_USE_ASSERT
+# XCFLAGS+= -DLUA_USE_ASSERT
+ifneq (,$(DEBUG))
+# Those are always useful without affecting runtime too much.
+XCFLAGS+= -DLUA_USE_ASSERT -DLUA_USE_APICHECK
+endif
 #
 ##############################################################################
 # You probably don't need to change anything below this line!
@@ -159,8 +170,7 @@ XCFLAGS=
 # Cross-compilation examples:
 #   make HOST_CC="gcc -m32" CROSS=i586-mingw32msvc- TARGET_SYS=Windows
 #   make HOST_CC="gcc -m32" CROSS=powerpc-linux-gnu-
-LJX_VERSION:=$(shell git describe 2> /dev/null || cat ../.version)
-XCFLAGS+=-DLJX_VERSION=\"$(LJX_VERSION)\"
+XCFLAGS+=-DLJX_VERSION=\"$(VERSION)\"
 
 CCOPTIONS= $(CCDEBUG) $(CCOPT) $(CCWARN) $(XCFLAGS) $(CFLAGS)
 LDOPTIONS= $(CCDEBUG) $(LDFLAGS)
@@ -188,8 +198,8 @@ TARGET_AR= $(CROSS)ar rcus
 TARGET_STRIP= $(CROSS)strip
 
 TARGET_LIBPATH= $(or $(PREFIX),/usr/local)/$(or $(MULTILIB),lib)
-TARGET_SONAME= libluajit-$(ABIVER).so.$(MAJVER)
-TARGET_DYLIBNAME= libluajit-$(ABIVER).$(MAJVER).dylib
+TARGET_SONAME= libluajit-ljx-$(ABIVER).so.$(VERSION)
+TARGET_DYLIBNAME= libluajit-ljx-$(ABIVER).$(VERSION).dylib
 TARGET_DYLIBPATH= $(TARGET_LIBPATH)/$(TARGET_DYLIBNAME)
 TARGET_DLLNAME= lua$(NODOTABIVER).dll
 TARGET_XSHLDFLAGS= -shared -fPIC -Wl,-soname,$(TARGET_SONAME)
@@ -299,7 +309,7 @@ ifeq (Darwin,$(TARGET_SYS))
   endif
   TARGET_XSHLDFLAGS= -dynamiclib -single_module -undefined dynamic_lookup -fPIC
   TARGET_DYNXLDOPTS=
-  TARGET_XSHLDFLAGS+= -install_name $(TARGET_DYLIBPATH) -compatibility_version $(MAJVER).$(MINVER) -current_version $(MAJVER).$(MINVER).$(RELVER)
+  TARGET_XSHLDFLAGS+= -install_name $(TARGET_DYLIBPATH) -compatibility_version LJX -current_version $(VERSION)
   ifeq (x64,$(TARGET_LJARCH))
     TARGET_XLDFLAGS+= -pagezero_size 10000 -image_base 100000000
     TARGET_XSHLDFLAGS+= -image_base 7fff04c4a000
@@ -311,7 +321,7 @@ ifeq (iOS,$(TARGET_SYS))
   TARGET_XCFLAGS+= -fno-stack-protector
   TARGET_XSHLDFLAGS= -dynamiclib -single_module -undefined dynamic_lookup -fPIC
   TARGET_DYNXLDOPTS=
-  TARGET_XSHLDFLAGS+= -install_name $(TARGET_DYLIBPATH) -compatibility_version $(MAJVER).$(MINVER) -current_version $(MAJVER).$(MINVER).$(RELVER)
+  TARGET_XSHLDFLAGS+= -install_name $(TARGET_DYLIBPATH) -compatibility_version LJX -current_version $(VERSION)
 else
   ifneq (,$(findstring stack-protector,$(shell $(TARGET_CC) -dumpspecs)))
     TARGET_XCFLAGS+= -fno-stack-protector
@@ -469,9 +479,9 @@ LIB_VMDEF= jit/vmdef.lua
 LIB_VMDEFP= $(LIB_VMDEF)
 
 LUAJIT_O= luajit.o
-LUAJIT_A= libluajit.a
-LUAJIT_SO= libluajit.so
-LUAJIT_T= luajit
+LUAJIT_A= libluajit-ljx.a
+LUAJIT_SO= libluajit-ljx.so
+LUAJIT_T= luajit-ljx
 
 ALL_T= $(LUAJIT_T) $(LUAJIT_A) $(LUAJIT_SO) $(HOST_T)
 ALL_HDRGEN= lj_bcdef.h lj_ffdef.h lj_libdef.h lj_recdef.h lj_folddef.h \
@@ -554,10 +564,13 @@ endif
 endif
 endif
 
+ifeq (,$(DEBUG))
 Q= @
 E= @echo
-#Q=
-#E= @:
+else
+Q=
+E= @:
+endif
 
 ##############################################################################
 # Make targets.
@@ -680,6 +693,6 @@ $(LUAJIT_T): $(TARGET_O) $(LUAJIT_O) $(TARGET_DEP)
 	$(E) "LINK      $@"
 	$(Q)$(TARGET_LD) $(TARGET_ALDFLAGS) -o $@ $(LUAJIT_O) $(TARGET_O) $(TARGET_ALIBS)
 	$(Q)$(TARGET_STRIP) $@
-	$(E) "OK        Successfully built LuaJIT/$(LJX_VERSION)"
+	$(E) "OK        Successfully built LuaJIT/$(VERSION)"
 
 ##############################################################################

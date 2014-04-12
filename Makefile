@@ -13,9 +13,6 @@
 # Copyright (C) 2005-2014 Mike Pall. See Copyright Notice in luajit.h
 ##############################################################################
 
-MAJVER=  2
-MINVER=  1
-RELVER=  0
 VERSION= $(shell git describe 2> /dev/null || cat .version)
 ABIVER=  5.2
 
@@ -32,7 +29,7 @@ DPREFIX= $(DESTDIR)$(PREFIX)
 INSTALL_BIN=   $(DPREFIX)/bin
 INSTALL_LIB=   $(DPREFIX)/$(MULTILIB)
 INSTALL_SHARE= $(DPREFIX)/share
-INSTALL_INC=   $(DPREFIX)/include/luajit-$(VERSION)
+INSTALL_INC=   $(DPREFIX)/include/ljx-$(ABIVER)
 
 INSTALL_LJLIBD= $(INSTALL_SHARE)/luajit-$(VERSION)
 INSTALL_JITLIB= $(INSTALL_LJLIBD)/jit
@@ -47,11 +44,11 @@ INSTALL_PKGCONFIG= $(INSTALL_LIB)/pkgconfig
 INSTALL_TNAME= ljx
 INSTALL_TSYMNAME= luajit
 INSTALL_ANAME= libluajit-ljx-$(ABIVER).a
-INSTALL_SONAME= libluajit-ljx-$(ABIVER).so.$(MAJVER).$(MINVER).$(RELVER)
+INSTALL_SONAME= libluajit-ljx-$(ABIVER).so.$(VERSION)
 INSTALL_SOSHORT= libluajit-ljx-$(ABIVER).so
-INSTALL_DYLIBNAME= libluajit-ljx-$(ABIVER).$(MAJVER).$(MINVER).$(RELVER).dylib
+INSTALL_DYLIBNAME= libluajit-ljx-$(ABIVER).$(VERSION).dylib
 INSTALL_DYLIBSHORT1= libluajit-ljx-$(ABIVER).dylib
-INSTALL_DYLIBSHORT2= libluajit-ljx-$(ABIVER).$(MAJVER).dylib
+INSTALL_DYLIBSHORT2= libluajit-ljx-$(ABIVER).LJX.dylib
 INSTALL_PCNAME= luajit-ljx.pc
 
 INSTALL_STATIC= $(INSTALL_LIB)/$(INSTALL_ANAME)
@@ -76,9 +73,10 @@ INSTALL_F= install -m 0644
 UNINSTALL= $(RM)
 LDCONFIG= ldconfig -n
 SED_PC= sed -e "s|^prefix=.*|prefix=$(PREFIX)|" \
-            -e "s|^multilib=.*|multilib=$(MULTILIB)|"
+            -e "s|^multilib=.*|multilib=$(MULTILIB)|" \
+            -e "s|^version=.*|version=$(VERSION)|"
 
-FILE_T= luajit
+FILE_T= luajit-ljx
 FILE_A= libluajit-ljx.a
 FILE_SO= libluajit-ljx.so
 FILE_MAN= luajit.1

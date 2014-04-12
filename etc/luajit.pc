@@ -1,23 +1,20 @@
 # Package information for LuaJIT to be used by pkg-config.
-majver=2
-minver=1
-relver=0
-version=${majver}.${minver}.${relver}-alpha
-abiver=5.1
+version=LJX
+abiver=5.2
 
 prefix=/usr/local
 multilib=lib
 exec_prefix=${prefix}
 libdir=${exec_prefix}/${multilib}
-libname=luajit-${abiver}
-includedir=${prefix}/include/luajit-${majver}.${minver}
+libname=luajit-ljx-${abiver}
+includedir=${prefix}/include/ljx-${abiver}
 
 INSTALL_LMOD=${prefix}/share/lua/${abiver}
 INSTALL_CMOD=${prefix}/${multilib}/lua/${abiver}
 
-Name: LuaJIT
-Description: Just-in-time compiler for Lua
-URL: http://luajit.org
+Name: LuaJIT-LJX
+Description: Experimental Just-in-time compiler for Lua
+URL: http://lua.org
 Version: ${version}
 Requires:
 Libs: -L${libdir} -l${libname}
