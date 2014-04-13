@@ -117,8 +117,9 @@
 #define LUA_MAXINPUT	512	/* Max. input line length. */
 #endif
 
-/* Note: changing the following defines breaks the Lua 5.1 ABI. */
+/* Note: changing the following defines breaks the ABI. */
 #define LUA_INTEGER	ptrdiff_t
+#define LUA_UNSIGNED    unsigned int
 #define LUA_IDSIZE	60	/* Size of lua_Debug.short_src. */
 /*
 ** Size of lauxlib and io.* on-stack buffers. Weird workaround to avoid using

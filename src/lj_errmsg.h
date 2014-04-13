@@ -99,6 +99,10 @@ ERRDEF(STRCAPU,	"unfinished capture")
 ERRDEF(STRFMT,	"invalid option " LUA_QS " to " LUA_QL("format"))
 ERRDEF(STRGSRV,	"invalid replacement value (a %s)")
 ERRDEF(BADMODN,	"name conflict for module " LUA_QS)
+ERRDEF(MULTIVM,	"multiple Lua VMs detected")
+ERRDEF(BADVER, "version mismatch: app. needs %f, Lua core provides %f")
+ERRDEF(BADCONV,	"cannot convert " LUA_QS " to " LUA_QS)
+
 #if LJ_HASJIT
 ERRDEF(JITPROT,	"runtime code generation failed, restricted kernel?")
 #if LJ_TARGET_X86ORX64
@@ -142,6 +146,8 @@ ERRDEF(XBREAK,	"no loop to break")
 ERRDEF(XLUNDEF,	"undefined label " LUA_QS)
 ERRDEF(XLDUP,	"duplicate label " LUA_QS)
 ERRDEF(XGSCOPE,	"<goto %s> jumps into the scope of local " LUA_QS)
+ERRDEF(BADLEN,	"attempt to get length of " LUA_QS)
+ERRDEF(BADLENNUM,"length of " LUA_QS " is not a number")
 
 /* Bytecode reader errors. */
 ERRDEF(BCFMT,	"cannot load incompatible bytecode")
@@ -159,6 +165,7 @@ ERRDEF(FFI_NUMPARAM,	"wrong number of type parameters")
 ERRDEF(FFI_INITOV,	"too many initializers for " LUA_QS)
 ERRDEF(FFI_BADCONV,	"cannot convert " LUA_QS " to " LUA_QS)
 ERRDEF(FFI_BADLEN,	"attempt to get length of " LUA_QS)
+ERRDEF(FFI_BADLENNUM,	"length of " LUA_QS " is not a number")
 ERRDEF(FFI_BADCONCAT,	"attempt to concatenate " LUA_QS " and " LUA_QS)
 ERRDEF(FFI_BADARITH,	"attempt to perform arithmetic on " LUA_QS " and " LUA_QS)
 ERRDEF(FFI_BADCOMP,	"attempt to compare " LUA_QS " with " LUA_QS)

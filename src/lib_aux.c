@@ -28,6 +28,7 @@
 
 /* -- I/O error handling -------------------------------------------------- */
 
+
 LUALIB_API int luaL_fileresult(lua_State *L, int stat, const char *fname)
 {
   if (stat) {
@@ -111,6 +112,20 @@ static int libsize(const luaL_Reg *l)
   return size;
 }
 
+LUALIB_API void luaL_setfuncs (lua_State *L, const luaL_Reg *l, int nup)
+{
+  lj_state_checkstack(L, nup);
+  for (; l->name; l++) {
+    int i;
+    for (i = 0; i < nup; i++)  /* copy upvalues to the top */
+      lua_pushvalue(L, -nup);
+    lua_pushcclosure(L, l->func, nup);
+    lua_setfield(L, -(nup+2), l->name);
+  }
+  lua_pop(L, nup);  /* remove upvalues */
+}
+
+
 LUALIB_API void luaL_openlib(lua_State *L, const char *libname,
 			     const luaL_Reg *l, int nup)
 {
@@ -131,20 +146,55 @@ LUALIB_API void luaL_openlib(lua_State *L, const char *libname,
     lua_remove(L, -2);  /* remove _LOADED table */
     lua_insert(L, -(nup+1));  /* move library table to below upvalues */
   }
-  for (; l->name; l++) {
-    int i;
-    for (i = 0; i < nup; i++)  /* copy upvalues to the top */
-      lua_pushvalue(L, -nup);
-    lua_pushcclosure(L, l->func, nup);
-    lua_setfield(L, -(nup+2), l->name);
-  }
-  lua_pop(L, nup);  /* remove upvalues */
+  if (l)
+    luaL_setfuncs(L, l, nup);
+  else
+    lua_pop(L, nup);
 }
 
 LUALIB_API void luaL_register(lua_State *L, const char *libname,
 			      const luaL_Reg *l)
 {
   luaL_openlib(L, libname, l, 0);
+}
+
+/*
+** ensure that stack[idx][fname] has a table and push that table
+** into the stack
+*/
+LUALIB_API int luaL_getsubtable (lua_State *L, int idx, const char *fname) {
+  lua_getfield(L, idx, fname);
+  if (lua_istable(L, -1)) return 1;  /* table already there */
+  else {
+    lua_pop(L, 1);  /* remove previous result */
+    idx = lua_absindex(L, idx);
+    lua_newtable(L);
+    lua_pushvalue(L, -1);  /* copy to be left at top */
+    lua_setfield(L, idx, fname);  /* assign new table to field */
+    return 0;  /* false, because did not find table there */
+  }
+}
+
+/*
+** stripped-down 'require'. Calls 'openf' to open a module,
+** registers the result in 'package.loaded' table and, if 'glb'
+** is true, also registers the result in the global table.
+** Leaves resulting module on the top.
+*/
+LUALIB_API void luaL_requiref (lua_State *L, const char *modname,
+                               lua_CFunction openf, int glb)
+{
+  lua_pushcfunction(L, openf);
+  lua_pushstring(L, modname);  /* argument to open function */
+  lua_call(L, 1, 1);  /* open module */
+  luaL_getsubtable(L, LUA_REGISTRYINDEX, "_LOADED");
+  lua_pushvalue(L, -2);  /* make copy of module (call result) */
+  lua_setfield(L, -2, modname);  /* _LOADED[modname] = module */
+  lua_pop(L, 1);  /* remove _LOADED table */
+  if (glb) {
+    lua_pushvalue(L, -1);  /* copy of 'mod' */
+    lua_setglobal(L, modname);  /* _G[modname] = module */
+  }
 }
 
 LUALIB_API const char *luaL_gsub(lua_State *L, const char *s,
@@ -353,4 +403,24 @@ LUA_API lua_State *lua_newstate(lua_Alloc f, void *ud)
 #endif
 
 #endif
+
+LUALIB_API void luaL_checkversion_ (lua_State *L, lua_Number ver) {
+  const lua_Number *v = lua_version(L);
+  if (v != lua_version(NULL))
+    lj_err_msg(L, LJ_ERR_MULTIVM);
+  else if (*v != ver)
+    lj_err_callerv(L, LJ_ERR_BADVER, ver, *v);
+  /* check conversions number -> integer types */
+  lua_pushnumber(L, -(lua_Number)0x1234);
+  if (lua_tointeger(L, -1) != -0x1234 ||
+      lua_tounsigned(L, -1) != (lua_Unsigned)-0x1234)
+    lj_err_callerv(L, LJ_ERR_BADCONV, "number", "int");
+  lua_pop(L, 1);
+}
+
+LUALIB_API void luaL_setmetatable (lua_State *L, const char *tname) {
+  luaL_getmetatable(L, tname);
+  lua_setmetatable(L, -2);
+}
+
 

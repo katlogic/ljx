@@ -446,7 +446,7 @@ typedef struct GCtab {
   GCHeader;
   uint8_t nomm;		/* Negative cache for fast metamethods. */
   int8_t colo;		/* Array colocation. */
-  MRef array;		/* Array part. */
+  MRef array;		/* Array part. Aliases env. */
   GCRef gclist;
   GCRef metatable;	/* Must be at same offset in GCudata. */
   MRef node;		/* Hash part. */
@@ -569,6 +569,7 @@ typedef struct global_State {
   MRef ctype_state;	/* Pointer to C type state. */
   GCRef gcroot[GCROOT_MAX];  /* GC roots. */
   MatchState ms;        /* Capture buffer for JIT mcode. */
+  const lua_Number *version;
 } global_State;
 
 #define mainthread(g)	(&gcref(g->mainthref)->th)
@@ -851,6 +852,15 @@ static LJ_AINLINE uint64_t lj_num2u64(lua_Number n)
   else
 #endif
     return (uint64_t)n;
+}
+static LJ_AINLINE LUA_UNSIGNED lj_num2u(lua_Number n)
+{
+#ifdef _MSC_VER
+  if (n >= 9223372036854775808.0)  /* They think it's a feature. */
+    return (uint64_t)(int64_t)(n - 18446744073709551616.0);
+  else
+#endif
+    return (LUA_UNSIGNED)n;
 }
 
 static LJ_AINLINE int32_t numberVint(cTValue *o)

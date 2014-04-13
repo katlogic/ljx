@@ -71,7 +71,7 @@ typedef unsigned int uintptr_t;
 
 /* Minimum table/buffer sizes. */
 #define LJ_MIN_GLOBAL	6		/* Min. global table size (hbits). */
-#define LJ_MIN_REGISTRY	2		/* Min. registry size (hbits). */
+#define LJ_MIN_REGISTRY	2		/* Min. registry size (hbits). ORDER LUA_RIDX_COUNT. */
 #define LJ_MIN_STRTAB	256		/* Min. string table size (pow2). */
 #define LJ_MIN_SBUF	32		/* Min. string buffer length. */
 #define LJ_MIN_VECSZ	8		/* Min. size for growable vectors. */

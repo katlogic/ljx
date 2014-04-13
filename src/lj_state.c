@@ -139,18 +139,43 @@ static void stack_init(lua_State *L1, lua_State *L)
 /* Open parts that may cause memory-allocation errors. */
 static TValue *cpluaopen(lua_State *L, lua_CFunction dummy, void *ud)
 {
+  GCtab *weak, *t, *reg;
   global_State *g = G(L);
   UNUSED(dummy);
   UNUSED(ud);
   stack_init(L, L);
-  /* NOBARRIER: State initialization, all objects are white. */
-  setgcref(L->env, obj2gco(lj_tab_new(L, 0, LJ_MIN_GLOBAL)));
-  settabV(L, registry(L), lj_tab_new(L, 0, LJ_MIN_REGISTRY));
+
+  /* Init strings and lexer. */
   lj_str_resize(L, LJ_MIN_STRTAB-1);
   lj_meta_init(L);
   lj_lex_init(L);
   fixstring(lj_err_str(L, LJ_ERR_ERRMEM));  /* Preallocate memory error msg. */
+
+  /* Create weak key metatable. */
+  weak = lj_tab_new(L, 0, 1);
+  setgcref(weak->metatable, obj2gco(weak));
+  setstrV(L, lj_tab_setstr(L, weak, lj_str_newlit(L, "__mode")), lj_str_newlit(L, "k"));
+  weak->nomm = (uint8_t)(~(1u<<MM_mode));
+ 
+  /* Registry table. */
+  reg = lj_tab_new(L, 0, LJ_MIN_REGISTRY);
+  settabV(L, registry(L), reg);
+
+  /* Globals table. */ 
+  t = lj_tab_new(L, 0, LJ_MIN_GLOBAL);
+  setgcref(L->env, obj2gco(t));
+  settabV(L, lj_tab_setint(L, reg, LUA_RIDX_GLOBALS), t);
+
+  /* Userval table. */
+  t = lj_tab_new(L, 0, 0);
+  setgcref(t->metatable, obj2gco(weak));
+  settabV(L, lj_tab_setint(L, reg, LUA_RIDX_USERVAL), t);
+
+  /* Register main thread. */  
+  setthreadV(L, lj_tab_setint(L, reg, LUA_RIDX_MAINTHREAD), L);
+
   g->gc.threshold = 4*g->gc.total;
+  g->version = lua_version(NULL);
   lj_trace_initstate(g);
   return NULL;
 }
