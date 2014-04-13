@@ -72,7 +72,7 @@ uint32_t lj_str_find(const char *s, const char *p, MSize slen, MSize plen, int32
 
   if (plen <= slen) {
     if (plen == 0) {
-      return 0; /* Empty patterns are not allowed. */
+      return start+1;
     } else {
       int c = *(const uint8_t *)p++;
       plen--; slen -= plen;
