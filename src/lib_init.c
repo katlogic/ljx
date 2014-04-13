@@ -40,9 +40,8 @@ LUALIB_API void luaL_openlibs(lua_State *L)
 {
   const luaL_Reg *lib;
   for (lib = lj_lib_load; lib->func; lib++) {
-    lua_pushcfunction(L, lib->func);
-    lua_pushstring(L, lib->name);
-    lua_call(L, 1, 0);
+    luaL_requiref(L, lib->name, lib->func, 1);
+    lua_pop(L, 1);  /* remove lib */
   }
   luaL_findtable(L, LUA_REGISTRYINDEX, "_PRELOAD",
 		 sizeof(lj_lib_preload)/sizeof(lj_lib_preload[0])-1);

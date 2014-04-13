@@ -130,7 +130,7 @@ static int docall(lua_State *L, int narg, int clear)
 
 static void print_version(void)
 {
-  fputs(LUA_VERSION " -- " LUA_COPYRIGHT ". " LUA_URL "\n", stdout);
+  fputs(LUA_RELEASE " -- " LUA_COPYRIGHT ". " LUA_URL "\n", stdout);
   fputs(LUAJIT_VERSION " -- " LUAJIT_COPYRIGHT ". " LUAJIT_URL "\n", stdout);
   fputs(LJX_VERSION " -- " LJX_COPYRIGHT ". " LJX_URL "\n", stdout);
 }

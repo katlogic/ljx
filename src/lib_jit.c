@@ -766,8 +766,8 @@ LUALIB_API int luaopen_jit(lua_State *L)
 #endif
 #if LJ_HASJIT
   LJ_LIB_REG(L, "jit.opt", jit_opt);
+  L->top -= 1;
 #endif
-  L->top -= 2;
   return 1;
 }
 

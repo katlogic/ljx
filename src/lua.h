@@ -16,8 +16,14 @@
 #include "luaconf.h"
 
 
-#define LUA_VERSION	"Lua 5.2"
-#define LUA_RELEASE	"Lua 5.2.0"
+#define LUA_VERSION_MAJOR       "5"
+#define LUA_VERSION_MINOR       "2"
+#define LUA_VERSION_NUM         502
+#define LUA_VERSION_RELEASE     "3"
+
+#define LUA_VERSION     "Lua " LUA_VERSION_MAJOR "." LUA_VERSION_MINOR
+#define LUA_RELEASE     LUA_VERSION "." LUA_VERSION_RELEASE
+
 #define LUA_VERSION_NUM	502
 #define LUA_COPYRIGHT	"Copyright (C) 1994-2013 Lua.org, PUC-Rio"
 #define LUA_AUTHORS	"R. Ierusalimschy, L. H. de Figueiredo & W. Celes"
@@ -46,7 +52,7 @@
 #define LUA_ENVIRONINDEX        (LUAI_FIRSTPSEUDOIDX-1)
 #define LUA_GLOBALSINDEX        (LUAI_FIRSTPSEUDOIDX-2)
 #endif
-#define LUA_UVINDEX             LUA_REGISTRYINDEX
+#define LUA_UVINDEX             LUA_GLOBALSINDEX
 #define lua_upvalueindex(i)	(LUA_UVINDEX-(i))
 
 /* predefined values in the registry */

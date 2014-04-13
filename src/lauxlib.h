@@ -29,12 +29,15 @@ typedef struct luaL_Reg {
 LUALIB_API int (luaL_len) (lua_State *L, int i);
 LUALIB_API void (luaL_setfuncs) (lua_State *L, const luaL_Reg *l, int nup);
 
+LUALIB_API int (luaL_getsubtable) (lua_State *L, int idx, const char *fname);
 LUALIB_API void (luaL_requiref) (lua_State *L, const char *modname,
                                lua_CFunction openf, int glb);
 LUALIB_API void (luaL_openlib) (lua_State *L, const char *libname,
                                 const luaL_Reg *l, int nup);
 LUALIB_API void (luaL_register) (lua_State *L, const char *libname,
                                 const luaL_Reg *l);
+LUALIB_API void (luaL_pushmodule) (lua_State *L, const char *modname,
+                                 int sizehint);
 LUALIB_API int (luaL_getmetafield) (lua_State *L, int obj, const char *e);
 LUALIB_API int (luaL_callmeta) (lua_State *L, int obj, const char *e);
 LUALIB_API int (luaL_typerror) (lua_State *L, int narg, const char *tname);

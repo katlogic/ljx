@@ -125,6 +125,28 @@ LUALIB_API void luaL_setfuncs (lua_State *L, const luaL_Reg *l, int nup)
   lua_pop(L, nup);  /* remove upvalues */
 }
 
+/*
+** Find or create a module table with a given name. The function
+** first looks at the _LOADED table and, if that fails, try a
+** global variable with that name. In any case, leaves on the stack
+** the module table.
+*/
+LUALIB_API void luaL_pushmodule (lua_State *L, const char *modname,
+                                 int sizehint) {
+  luaL_findtable(L, LUA_REGISTRYINDEX, "_LOADED", 1);  /* get _LOADED table */
+  lua_getfield(L, -1, modname);  /* get _LOADED[modname] */
+  if (!lua_istable(L, -1)) {  /* not found? */
+    lua_pop(L, 1);  /* remove previous result */
+    /* try global variable (and create one if it does not exist) */
+    lua_pushglobaltable(L);
+    if (luaL_findtable(L, 0, modname, sizehint) != NULL)
+      luaL_error(L, "name conflict for module " LUA_QS, modname);
+    lua_pushvalue(L, -1);
+    lua_setfield(L, -3, modname);  /* _LOADED[modname] = new table */
+  }
+  lua_remove(L, -2);  /* remove _LOADED table */
+}
+
 
 LUALIB_API void luaL_openlib(lua_State *L, const char *libname,
 			     const luaL_Reg *l, int nup)
@@ -187,6 +209,7 @@ LUALIB_API void luaL_requiref (lua_State *L, const char *modname,
   lua_pushcfunction(L, openf);
   lua_pushstring(L, modname);  /* argument to open function */
   lua_call(L, 1, 1);  /* open module */
+  lua_assert(lua_istable(L, -1));
   luaL_getsubtable(L, LUA_REGISTRYINDEX, "_LOADED");
   lua_pushvalue(L, -2);  /* make copy of module (call result) */
   lua_setfield(L, -2, modname);  /* _LOADED[modname] = module */
