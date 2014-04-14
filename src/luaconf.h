@@ -79,6 +79,7 @@
 #define LUA_PATH	"LUA_PATH"
 #define LUA_CPATH	"LUA_CPATH"
 #define LUA_INIT	"LUA_INIT"
+#define LUA_INIT_5_2	"LUA_INIT_5_2"
 
 /* Special file system characters. */
 #if defined(_WIN32)
