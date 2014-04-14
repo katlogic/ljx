@@ -72,7 +72,7 @@
 #define LUA_CPATH_DEFAULT _LUA_CPATH_CWD ";" _LUA_CPATH_DEFAULT
 #else
 #define LUA_PATH_DEFAULT _LUA_PATH_DEFAULT ";" _LUA_PATH_CWD
-#define LUA_CPATH_DEFAULT _LUA_CPATH_DEFAULT ";" _LUA_PATH_CWD
+#define LUA_CPATH_DEFAULT _LUA_CPATH_DEFAULT ";" _LUA_CPATH_CWD
 #endif
 
 /* Environment variable names for path overrides and initialization code. */
