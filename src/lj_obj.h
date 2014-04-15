@@ -535,6 +535,7 @@ typedef struct GCState {
   MSize debt;		/* Debt (how much GC is behind schedule). */
   MSize estimate;	/* Estimate of memory actually in use. */
   MSize pause;		/* Pause between successive GC cycles. */
+  int isrunning;        /* Not actually used except by collectgarbage(). */
 } GCState;
 
 /* Global state, shared by all threads of a Lua universe. */

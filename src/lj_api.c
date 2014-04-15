@@ -1349,12 +1349,14 @@ LUA_API int lua_gc(lua_State *L, int what, int data)
   int res = 0;
   switch (what) {
   case LUA_GCISRUNNING:
-    res = g->gc.threshold != LJ_MAX_MEM;
+    res = g->gc.isrunning;
     break;
   case LUA_GCSTOP:
+    g->gc.isrunning = 0;
     g->gc.threshold = LJ_MAX_MEM;
     break;
   case LUA_GCRESTART:
+    g->gc.isrunning = 1;
     g->gc.threshold = data == -1 ? (g->gc.total/100)*g->gc.pause : g->gc.total;
     break;
   case LUA_GCCOLLECT:
