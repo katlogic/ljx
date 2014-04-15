@@ -96,20 +96,18 @@ static int report(lua_State *L, int status)
   return status;
 }
 
-static int traceback(lua_State *L)
-{
-  if (!lua_isstring(L, 1)) { /* Non-string error object? Try metamethod. */
-    if (lua_isnoneornil(L, 1) ||
-	!luaL_callmeta(L, 1, "__tostring") ||
-	!lua_isstring(L, -1))
-      return 1;  /* Return non-string error object. */
-    lua_remove(L, 1);  /* Replace object by result of __tostring metamethod. */
+static int traceback (lua_State *L) {
+  const char *msg = lua_tostring(L, 1);
+  if (msg)
+    luaL_traceback(L, L, msg, 1);
+  else if (!lua_isnoneornil(L, 1)) {  /* is there an error object? */
+    if (!luaL_callmeta(L, 1, "__tostring"))  /* try its 'tostring' metamethod */
+      lua_pushliteral(L, "(no error message)");
   }
-  luaL_traceback(L, L, lua_tostring(L, 1), 1);
   return 1;
 }
 
-static int docall(lua_State *L, int narg, int clear)
+static int docall(lua_State *L, int narg, int nres)
 {
   int status;
   int base = lua_gettop(L) - narg;  /* function index */
@@ -118,7 +116,7 @@ static int docall(lua_State *L, int narg, int clear)
 #if !LJ_TARGET_CONSOLE
   signal(SIGINT, laction);
 #endif
-  status = lua_pcall(L, narg, (clear ? 0 : LUA_MULTRET), base);
+  status = lua_pcall(L, narg, nres, base);
 #if !LJ_TARGET_CONSOLE
   signal(SIGINT, SIG_DFL);
 #endif
@@ -126,13 +124,6 @@ static int docall(lua_State *L, int narg, int clear)
   /* force a complete garbage collection in case of errors */
   if (status != 0) lua_gc(L, LUA_GCCOLLECT, 0);
   return status;
-}
-
-static void print_version(void)
-{
-  fputs(LUA_RELEASE " -- " LUA_COPYRIGHT ". " LUA_URL "\n", stdout);
-  fputs(LUAJIT_VERSION " -- " LUAJIT_COPYRIGHT ". " LUAJIT_URL "\n", stdout);
-  fputs(LJX_VERSION " -- " LJX_COPYRIGHT ". " LJX_URL "\n", stdout);
 }
 
 static void print_jit_status(lua_State *L)
@@ -152,6 +143,16 @@ static void print_jit_status(lua_State *L)
     fputs(s, stdout);
   }
   putc('\n', stdout);
+}
+
+static void print_version(lua_State *L, int jit)
+{
+#ifndef LUAJIT_PRETEND_RIO
+  fputs(LJX_VERSION " -- " LJX_COPYRIGHT ". " LJX_URL "\n", stdout);
+  fputs(LUAJIT_VERSION " -- " LUAJIT_COPYRIGHT ". " LUAJIT_URL "\n", stdout);
+  if (jit) print_jit_status(L);
+#endif
+  fputs(LUA_RELEASE "  " LUA_COPYRIGHT"\n", stdout);
 }
 
 static int getargs(lua_State *L, char **argv, int n)
@@ -174,21 +175,25 @@ static int getargs(lua_State *L, char **argv, int n)
 
 static int dofile(lua_State *L, const char *name)
 {
-  int status = luaL_loadfile(L, name) || docall(L, 0, 1);
+  int status = luaL_loadfile(L, name) || docall(L, 0, 0);
   return report(L, status);
 }
 
 static int dostring(lua_State *L, const char *s, const char *name)
 {
-  int status = luaL_loadbuffer(L, s, strlen(s), name) || docall(L, 0, 1);
+  int status = luaL_loadbuffer(L, s, strlen(s), name) || docall(L, 0, 0);
   return report(L, status);
 }
 
 static int dolibrary(lua_State *L, const char *name)
 {
+  int status;
   lua_getglobal(L, "require");
   lua_pushstring(L, name);
-  return report(L, docall(L, 1, 1));
+  status = docall(L, 1, 1);  /* call 'require(name)' */
+  if (status == LUA_OK)
+    lua_setglobal(L, name);  /* global[name] = require return */
+  return report(L, status);
 }
 
 static void write_prompt(lua_State *L, int firstline)
@@ -258,7 +263,7 @@ static void dotty(lua_State *L)
   const char *oldprogname = progname;
   progname = NULL;
   while ((status = loadline(L)) != -1) {
-    if (status == 0) status = docall(L, 0, 0);
+    if (status == 0) status = docall(L, 0, LUA_MULTRET);
     report(L, status);
     if (status == 0 && lua_gettop(L) > 0) {  /* any result to print? */
       lua_getglobal(L, "print");
@@ -287,7 +292,7 @@ static int handle_script(lua_State *L, char **argv, int n)
   status = luaL_loadfile(L, fname);
   lua_insert(L, -(narg+1));
   if (status == 0)
-    status = docall(L, narg, 0);
+    status = docall(L, narg, LUA_MULTRET);
   else
     lua_pop(L, narg);
   return report(L, status);
@@ -534,7 +539,7 @@ static int pmain(lua_State *L)
     s->status = handle_luainit(L);
     if (s->status != 0) return 0;
   }
-  if ((flags & FLAGS_VERSION)) print_version();
+  if ((flags & FLAGS_VERSION)) print_version(L, 0);
   s->status = runargs(L, argv, (script > 0) ? script : s->argc);
   if (s->status != 0) return 0;
   if (script) {
@@ -546,8 +551,7 @@ static int pmain(lua_State *L)
     dotty(L);
   } else if (script == 0 && !(flags & (FLAGS_EXEC|FLAGS_VERSION))) {
     if (lua_stdin_is_tty()) {
-      print_version();
-      print_jit_status(L);
+      print_version(L, 1);
       dotty(L);
     } else {
       dofile(L, NULL);  /* executes stdin as a file */

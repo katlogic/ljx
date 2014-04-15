@@ -100,14 +100,17 @@ XCFLAGS=
 # make use of it.
 #XCFLAGS+= -DLUAJIT_DISABLE_FFI
 #
-# Features from Lua 5.2 that are unlikely to break existing code are
+# Features from Lua 5.1 that are unlikely to break existing code are
 # enabled by default. Some other features that *might* break some existing
 # code (e.g. __pairs or os.execute() return values) can be enabled here.
-# Note: this does not provide full compatibility with Lua 5.2 at this time.
+# Note: this does not provide full compatibility with Lua 5.1 at this time.
 #XCFLAGS+= -DLUAJIT_ENABLE_LUA51COMPAT
 #
 # Disable the JIT compiler, i.e. turn LuaJIT into a pure interpreter.
 #XCFLAGS+= -DLUAJIT_DISABLE_JIT
+#
+# Superficially pretend to be stock Lua (supress ljx/luajit banners).
+# XCFLAGS+= -DLUAJIT_PRETEND_RIO
 #
 # Some architectures (e.g. PPC) can use either single-number (1) or
 # dual-number (2) mode. Uncomment one of these lines to override the
