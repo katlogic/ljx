@@ -193,7 +193,7 @@ static void close_state(lua_State *L)
   lj_mem_freevec(g, g->strhash, g->strmask+1, GCRef);
   lj_buf_free(g, &g->tmpbuf);
   lj_mem_freevec(g, tvref(L->stack), L->stacksize, TValue);
-  lua_assert(g->gc.total == sizeof(GG_State));
+  lua_assert(gc_gettotalbytes(g) == sizeof(GG_State));
 #ifndef LUAJIT_USE_SYSMALLOC
   if (g->allocf == lj_alloc_f)
     lj_alloc_destroy(g->allocd);
@@ -233,7 +233,7 @@ LUA_API lua_State *lua_newstate(lua_Alloc f, void *ud)
   lj_buf_init(NULL, &g->tmpbuf);
   g->gc.state = GCSpause;
   setgcref(g->gc.root, obj2gco(L));
-  setmref(g->gc.sweep, &g->gc.root);
+  setmref(g->gc.sweep, NULL);
   g->gc.total = sizeof(GG_State);
   g->gc.debt = 0;
   g->gc.flags = GCF_stayontrace;

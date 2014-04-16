@@ -1383,8 +1383,8 @@ static void build_subroutines(BuildCtx *ctx)
   |
   |// Inlined GC threshold check. Caveat: uses label 1.
   |.macro ffgccheck
-  |  test dword [DISPATCH+DISPATCH_GL(gc.debt)], -1
-  |  jz >1
+  |  cmp dword [DISPATCH+DISPATCH_GL(gc.debt)], 0
+  |  jbe >1
   |  call ->fff_gcstep
   |1:
   |.endmacro
@@ -4368,9 +4368,9 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  ins_AD	// RA = dst, RD = hbits|asize
     |  mov L:RB, SAVE_L
     |  mov L:RB->base, BASE
-    |  test dword[DISPATCH+DISPATCH_GL(gc.debt)], -1
+    |  cmp dword[DISPATCH+DISPATCH_GL(gc.debt)], 0
     |  mov SAVE_PC, PC
-    |  jnz >5
+    |  ja >5
     |1:
     |.if X64
     |  mov CARG3d, RD
@@ -4412,9 +4412,9 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  ins_AND	// RA = dst, RD = table const (~) (holding template table)
     |  mov L:RB, SAVE_L
     |  mov SAVE_PC, PC
-    |  test dword [DISPATCH+DISPATCH_GL(gc.debt)], -1
+    |  cmp dword [DISPATCH+DISPATCH_GL(gc.debt)], 0
     |  mov L:RB->base, BASE
-    |  jnz >3
+    |  ja >3
     |2:
     |  mov TAB:FCARG2, [KBASE+RD*4]	// Caveat: FCARG2 == BASE
     |  mov L:FCARG1, L:RB		// Caveat: FCARG1 == RA

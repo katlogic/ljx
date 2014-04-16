@@ -130,7 +130,6 @@ static void gc_mark(global_State *g, GCobj *o)
     gray2black(o);  /* Userdata are never gray. */
     if (mt) gc_markobj(g, mt);
     getuservalue(mainthread(g), gco2ud(o), &uvalue);
-    gc_markobj(g, tabref(gco2ud(o)->env));
     if (tviswhite(&uvalue))
       return gc_mark(g, gcval(&uvalue));
   } else if (LJ_UNLIKELY(gct == ~LJ_TUPVAL)) {
@@ -552,7 +551,7 @@ static GCRef *gc_sweep(global_State *g, GCRef *p, uint32_t lim)
       gc_freefunc[o->gch.gct - ~LJ_TSTR](g, o);
     }
   }
-  return p;
+  return gcref(*p) ? p : NULL;
 }
 
 /* Sweep a list until a live object (or end of list). */
@@ -645,7 +644,7 @@ static void gc_call_finalizer(global_State *g, lua_State *L,
 static void gc_finalize(lua_State *L, int rethrow)
 {
   global_State *g = G(L);
-  GCobj *o = gcnext(gcref(g->gc.tobefnz));
+  GCobj *o = gcref(g->gc.tobefnz);
   cTValue *mo;
   lua_assert(tvref(g->jit_base) == NULL);  /* Must not be called on trace. */
 
@@ -771,9 +770,8 @@ void lj_gc_checkfinalizer(lua_State *L, GCobj *o)
 void lj_gc_setdebt(global_State *g, long debt)
 {
 //  lua_assert(debt > g->gc.debt);
-  g->gc.total = debt - g->gc.debt;
+  g->gc.total -= (debt - g->gc.debt);
   g->gc.debt = debt;
-  printf("%d %d\n", debt, g->gc.total);
 }
 
 /* Estimate pause to wait between gc cycles. */
@@ -789,11 +787,13 @@ static void gc_setpause(global_State *g, MSize estimate) {
   lj_gc_setdebt(g, debt);
 }
 
-/* Fast forward already swept objects, return number of casualties. */
+/* Fast forward already swept objects and start in string phase.  */
 static int gc_entersweep(lua_State *L) {
   global_State *g = G(L);
   int n = 0;
-  lua_assert(!mref(g->gc.sweep, GCRef *));
+  g->gc.sweepstr = 0;
+  g->gc.state = GCSswpstr;  /* Start of sweep phase. */
+  lua_assert(!mref(g->gc.sweep, GCRef));
   setmref(g->gc.sweep, gc_sweeptolive(L, &g->gc.root, &n));
   return n;
 }
@@ -908,25 +908,24 @@ static size_t gc_onestep(lua_State *L)
       return g->gc.memtrav - oldtrav;
     }
     case GCSatomic: {
-      size_t work;
+      size_t work, sw;
       if (tvref(g->jit_base))  /* Don't run atomic phase on trace. */
         return LJ_MAX_MEM;
       gc_propagate_all(g);
       g->gc.estimate = g->gc.memtrav;  /* save what was counted */;
       work = atomic(g, L);
       g->gc.estimate += work;
-      g->gc.state = GCSswpstr;  /* Start of sweep phase. */
       g->gc.flags |= GCF_stayontrace;
-      g->gc.sweepstr = 0;
-      return work;
+      sw = gc_entersweep(L); /* -> GCSswpstr */
+      return work + sw * GCSWEEPCOST;
     }
     case GCSswpstr: {
-      int alives = !!gc_fullsweep(g, &g->strhash[g->gc.sweepstr++]);  /* Sweep one chain. */
-      if (g->gc.sweepstr > g->strmask) {
+      if (g->gc.sweepstr >= g->strmask) {
         g->gc.state = GCSswpallgc;  /* All string hash chains sweeped. */
-        alives += gc_entersweep(L); /* -> GCSswpallgc */
+        return 0;
       }
-      return alives * GCSWEEPCOST;
+      gc_fullsweep(g, &g->strhash[g->gc.sweepstr++]);  /* Sweep one chain. */
+      return GCSWEEPSTRCOST;
     }
     case GCSswpallgc:  /* sweep "regular" objects */
       return gc_sweepstep(L, g, GCSswpfinobj, &g->gc.finobj);
@@ -967,7 +966,8 @@ int LJ_FASTCALL lj_gc_step(lua_State *L)
   }
 
   /* Adjust debt and transition VM to GC state. */ 
-  debt = (g->gc.debt / STEPMULADJ) + 1;
+  debt = g->gc.debt;
+  debt = (debt / STEPMULADJ) + 1;
   debt = (debt < LJ_MAX_MEM / g->gc.stepmul) ? debt * g->gc.stepmul : LJ_MAX_MEM;
   setvmstate(g, GC);
 
@@ -1041,7 +1041,6 @@ void lj_gc_fullgc(lua_State *L)
 }
 
 /* -- Allocator ----------------------------------------------------------- */
-
 /* Call pluggable memory allocator to allocate or resize a fragment. */
 void *lj_mem_realloc(lua_State *L, void *p, MSize osz, MSize nsz)
 {

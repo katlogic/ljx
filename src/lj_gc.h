@@ -31,9 +31,10 @@
 	((g)->gc.state >= GCSswpstr && (g)->gc.state <= GCSswpend)
 
 #define GCFINHEADSTART  1
-#define GCSTEPSIZE	1024u
+#define GCSTEPSIZE	1024
 #define GCSWEEPMAX	40
 #define GCSWEEPCOST	10
+#define GCSWEEPSTRCOST	10
 #define GCFINALIZECOST	GCSWEEPCOST
 #define STEPMULADJ      200
 #define PAUSEADJ        100
@@ -103,10 +104,10 @@ LJ_FUNC void lj_gc_fullgc(lua_State *L);
 
 /* GC check: drive collector forward if the GC threshold has been reached. */
 #define lj_gc_check(L) \
-  { if (LJ_UNLIKELY(G(L)->gc.debt)) \
+  { if (LJ_UNLIKELY(G(L)->gc.debt > 0)) \
       lj_gc_step(L); }
 #define lj_gc_check_fixtop(L) \
-  { if (LJ_UNLIKELY(G(L)->gc.debt)) \
+  { if (LJ_UNLIKELY(G(L)->gc.debt > 0)) \
       lj_gc_step_fixtop(L); }
 
 /* Write barriers. */
@@ -121,9 +122,9 @@ LJ_FUNC void lj_gc_barriertrace(global_State *g, uint32_t traceno);
 static LJ_AINLINE void lj_gc_barrierback(global_State *g, GCtab *t)
 {
   GCobj *o = obj2gco(t);
-  lua_assert(t->gct != ~LJ_TTAB);
+  lua_assert(t->gct == ~LJ_TTAB);
   lua_assert(isblack(o) && !isdead(g, o));
-//  lua_assert(g->gc.state != GCSfinalize && g->gc.state != GCSpause);
+  lua_assert(g->gc.state != GCScallfin && g->gc.state != GCSpause);
   black2gray(o);
   setgcrefr(t->gclist, g->gc.grayagain);
   setgcref(g->gc.grayagain, o);
@@ -158,7 +159,7 @@ LJ_FUNC void *lj_mem_grow(lua_State *L, void *p,
 
 static LJ_AINLINE void lj_mem_free(global_State *g, void *p, size_t osize)
 {
-  g->gc.total -= (MSize)osize;
+  g->gc.debt -= (MSize)osize;
   g->allocf(g->allocd, p, osize, 0);
 }
 
@@ -174,7 +175,7 @@ static LJ_AINLINE void lj_mem_free(global_State *g, void *p, size_t osize)
 #define lj_mem_freet(g, p)	lj_mem_free(g, (p), sizeof(*(p)))
 
 /* actual number of total bytes allocated */
-#define gc_gettotalbytes(g)	((g)->gc.debt + (g)->gc.total)
+#define gc_gettotalbytes(g)	((g)->gc.total + (g)->gc.debt)
 
 #endif
 
