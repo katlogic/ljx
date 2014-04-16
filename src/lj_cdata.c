@@ -31,6 +31,7 @@ GCcdata *lj_cdata_newv(lua_State *L, CTypeID id, CTSize sz, CTSize align)
   global_State *g;
   MSize extra = sizeof(GCcdataVar) + sizeof(GCcdata) +
 		(align > CT_MEMALIGN ? (1u<<align) - (1u<<CT_MEMALIGN) : 0);
+  /* TBD: why not just new_gco? */
   char *p = lj_mem_newt(L, extra + sz, char);
   uintptr_t adata = (uintptr_t)p + sizeof(GCcdataVar) + sizeof(GCcdata);
   uintptr_t almask = (1u << align) - 1u;
@@ -52,19 +53,7 @@ GCcdata *lj_cdata_newv(lua_State *L, CTypeID id, CTSize sz, CTSize align)
 /* Free a C data object. */
 void LJ_FASTCALL lj_cdata_free(global_State *g, GCcdata *cd)
 {
-  if (LJ_UNLIKELY(cd->marked & LJ_GC_CDATA_FIN)) {
-    GCobj *root;
-    makewhite(g, obj2gco(cd));
-    markfinalized(obj2gco(cd));
-    if ((root = gcref(g->gc.mmudata)) != NULL) {
-      setgcrefr(cd->nextgc, root->gch.nextgc);
-      setgcref(root->gch.nextgc, obj2gco(cd));
-      setgcref(g->gc.mmudata, obj2gco(cd));
-    } else {
-      setgcref(cd->nextgc, obj2gco(cd));
-      setgcref(g->gc.mmudata, obj2gco(cd));
-    }
-  } else if (LJ_LIKELY(!cdataisv(cd))) {
+  if (LJ_LIKELY(!cdataisv(cd))) {
     CType *ct = ctype_raw(ctype_ctsG(g), cd->ctypeid);
     CTSize sz = ctype_hassize(ct->info) ? ct->size : CTSIZE_PTR;
     lua_assert(ctype_hassize(ct->info) || ctype_isfunc(ct->info) ||
@@ -85,10 +74,7 @@ void lj_cdata_setfin(lua_State *L, GCcdata *cd, GCobj *obj, uint32_t it)
     lj_gc_anybarriert(L, t);
     tv = lj_tab_set(L, t, &tmp);
     setgcV(L, tv, obj, it);
-    if (!tvisnil(tv))
-      cd->marked |= LJ_GC_CDATA_FIN;
-    else
-      cd->marked &= ~LJ_GC_CDATA_FIN;
+    lj_gc_checkfinalizer(L, obj);
   }
 }
 

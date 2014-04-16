@@ -12,7 +12,7 @@
 
 GCudata *lj_udata_new(lua_State *L, MSize sz, GCtab *env)
 {
-  GCudata *ud = lj_mem_newt(L, sizeof(GCudata) + sz, GCudata);
+  GCudata *ud = lj_mem_newgco(L, sizeof(GCudata) + sz);
   global_State *g = G(L);
   newwhite(g, ud);  /* Not finalized. */
   ud->gct = ~LJ_TUDATA;
@@ -20,10 +20,14 @@ GCudata *lj_udata_new(lua_State *L, MSize sz, GCtab *env)
   ud->len = sz;
   /* NOBARRIER: The GCudata is new (marked white). */
   setgcrefnull(ud->metatable);
+  /* Lua 5.1 sets caller's env, 5.2 sets nil. */
+#if LJ_51
   setgcref(ud->env, obj2gco(env));
-  /* Chain to userdata list (after main thread). */
-  setgcrefr(ud->nextgc, mainthread(g)->nextgc);
-  setgcref(mainthread(g)->nextgc, obj2gco(ud));
+  ud->envtt = ~LJ_TTAB;
+#else
+  setgcrefnull(ud->env);
+  ud->envtt = ~LJ_TNIL;
+#endif
   return ud;
 }
 

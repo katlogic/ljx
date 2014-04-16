@@ -2426,16 +2426,19 @@ static void asm_stack_restore(ASMState *as, SnapShot *snap)
 }
 
 /* -- GC handling --------------------------------------------------------- */
-
 /* Check GC threshold and do one or more GC steps. */
 static void asm_gc_check(ASMState *as)
 {
   const CCallInfo *ci = &lj_ir_callinfo[IRCALL_lj_gc_step_jit];
   IRRef args[2];
+#if 0
   MCLabel l_end;
+#endif
   Reg tmp;
   ra_evictset(as, RSET_SCRATCH);
+#if 0
   l_end = emit_label(as);
+#endif
   /* Exit trace if in GCSatomic or GCSfinalize. Avoids syncing GC objects. */
   asm_guardcc(as, CC_NE);  /* Assumes asm_snap_prep() already done. */
   emit_rr(as, XO_TEST, RID_RET, RID_RET);
@@ -2445,14 +2448,16 @@ static void asm_gc_check(ASMState *as)
   tmp = ra_releasetmp(as, ASMREF_TMP1);
   emit_loada(as, tmp, J2G(as->J));
   emit_loadi(as, ra_releasetmp(as, ASMREF_TMP2), as->gcsteps);
+#if 0
+  // XXX TBD
   /* Jump around GC step if GC total < GC threshold. */
   emit_sjcc(as, CC_B, l_end);
   emit_opgl(as, XO_ARITH(XOg_CMP), tmp, gc.threshold);
   emit_getgl(as, tmp, gc.total);
+#endif
   as->gcsteps = 0;
   checkmclim(as);
 }
-
 /* -- Loop handling ------------------------------------------------------- */
 
 /* Fixup the loop branch. */

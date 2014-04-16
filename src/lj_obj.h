@@ -260,11 +260,13 @@ typedef struct GCstr {
 typedef struct GCudata {
   GCHeader;
   uint8_t udtype;	/* Userdata type. */
-  uint8_t unused2;
+  uint8_t envtt;        /* Userdata ttype. */
   GCRef env;		/* Should be at same offset in GCfunc. */
   MSize len;		/* Size of payload. */
   GCRef metatable;	/* Must be at same offset in GCtab. */
+#ifdef LJ_64
   uint32_t align1;	/* To force 8 byte alignment of the payload. */
+#endif
 } GCudata;
 
 /* Userdata types. */
@@ -518,24 +520,31 @@ typedef enum {
 #define mmname_str(g, mm)	(strref((g)->gcroot[GCROOT_MMNAME+(mm)]))
 
 typedef struct GCState {
-  MSize total;		/* Memory currently allocated. */
-  MSize threshold;	/* Memory threshold. */
-  uint8_t currentwhite;	/* Current white color. */
-  uint8_t state;	/* GC state. */
-  uint8_t nocdatafin;	/* No cdata finalizer called. */
-  uint8_t unused2;
-  MSize sweepstr;	/* Sweep position in string table. */
-  GCRef root;		/* List of all collectable objects. */
   MRef sweep;		/* Sweep position in root list. */
+  GCRef root;		/* List of all collectable objects. */
+  GCRef finobj;         /* List of collectable objects with finalizers */
   GCRef gray;		/* List of gray objects. */
+
   GCRef grayagain;	/* List of objects for atomic traversal. */
-  GCRef weak;		/* List of weak tables (to be cleared). */
-  GCRef mmudata;	/* List of userdata (to be finalized). */
+  GCRef weak;		/* List of weak values (to be cleared). */
+  GCRef ephemeron;      /* Weak keys */
+  GCRef allweak;        /* Both keys and values weak */
+
+  GCRef tobefnz;        /* Sweep position in finalized. g->gcnext is head. */
+  MSize memtrav;        /* memory traversed by the GC */
+  MSize sweepstr;	/* Sweep position in string table. */
+  uint8_t currentwhite;	/* Current white color. */
+  uint8_t state;	/* GC state machine. */
+  uint8_t nocdatafin;	/* No cdata finalizer called. */
+  uint8_t flags;        /* GCF_* */
+
   MSize stepmul;	/* Incremental GC step granularity. */
-  MSize debt;		/* Debt (how much GC is behind schedule). */
+  MSize finnum;         /* Number of finalizers to call. */
   MSize estimate;	/* Estimate of memory actually in use. */
   MSize pause;		/* Pause between successive GC cycles. */
-  int isrunning;        /* Not actually used except by collectgarbage(). */
+
+  MSize total;
+  long debt;            /* Bytes allocated not yet compensated by the collector */
 } GCState;
 
 /* Global state, shared by all threads of a Lua universe. */
@@ -778,6 +787,14 @@ static LJ_AINLINE void setgcV(lua_State *L, TValue *o, GCobj *v, uint32_t itype)
 {
   setgcref(o->gcr, v); setitype(o, itype); tvchecklive(L, o);
 }
+
+#define setuservalue(L,u,o) \
+  { const TValue *io=(o); GCudata *iu = (u); \
+  iu->env = io->it; io->envtt = io->tt; tvchecklive(L, io) }
+
+#define getuservalue(L,u,o) \
+  setgcV(L, o, gcref(u->env), u->envtt)
+
 
 #define define_setV(name, type, tag) \
 static LJ_AINLINE void name(lua_State *L, TValue *o, type *v) \

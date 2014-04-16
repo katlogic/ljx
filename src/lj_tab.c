@@ -158,7 +158,8 @@ GCtab *lj_tab_new_ah(lua_State *L, int32_t a, int32_t h)
 #if LJ_HASJIT
 GCtab * LJ_FASTCALL lj_tab_new1(lua_State *L, uint32_t ahsize)
 {
-  GCtab *t = newtab(L, ahsize & 0xffffff, ahsize >> 24);
+  GCtab *t;
+  t = newtab(L, ahsize & 0xffffff, ahsize >> 24);
   clearapart(t);
   if (t->hmask > 0) clearhpart(t);
   return t;

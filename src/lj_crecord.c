@@ -1,6 +1,9 @@
 /*
 ** Trace recorder for C data operations.
 ** Copyright (C) 2005-2014 Mike Pall. See Copyright Notice in luajit.h
+**
+** Minor FFI API extensions
+** Copyright (C) 2005-2014 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #define lj_ffrecord_c

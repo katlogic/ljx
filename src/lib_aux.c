@@ -2,8 +2,11 @@
 ** Auxiliary library for the Lua/C API.
 ** Copyright (C) 2005-2014 Mike Pall. See Copyright Notice in luajit.h
 **
-** Major parts taken verbatim or adapted from the Lua interpreter.
-** Copyright (C) 1994-2008 Lua.org, PUC-Rio. See Copyright Notice in lua.h
+** Lua 5.2 port
+** Copyright (C) 2014 Karel Tuma. See Copyright Notice in luajit.h
+**
+** Major parts taken verbatim or adapted from the Lua 5.2.3 interpreter.
+** Copyright (C) 1994-2014 Lua.org, PUC-Rio. See Copyright Notice in lua.h
 */
 
 #include <errno.h>

@@ -1,6 +1,9 @@
 /*
 ** Fast function call recorder.
 ** Copyright (C) 2005-2014 Mike Pall. See Copyright Notice in luajit.h
+**
+** Lua 5.2 string semantics and string.match() compiling
+** Copyright (C) 2014 Karel Tuma. See Copyright Notice in luajit.h
 */
 
 #define lj_ffrecord_c

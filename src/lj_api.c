@@ -2,6 +2,9 @@
 ** Public Lua/C API.
 ** Copyright (C) 2005-2014 Mike Pall. See Copyright Notice in luajit.h
 **
+** Adaption to Lua 5.2
+** Copyright (C) 2014 Karel Tuma. See Copyright Notice in luajit.h
+**
 ** Major portions taken verbatim or adapted from the Lua interpreter.
 ** Copyright (C) 1994-2008 Lua.org, PUC-Rio. See Copyright Notice in lua.h
 */
@@ -1085,14 +1088,13 @@ LUA_API int lua_setmetatable(lua_State *L, int idx)
     mt = tabV(L->top-1);
   }
   g = G(L);
-  if (tvistab(o)) {
+  if (tvistab(o) || tvisudata(o)) {
     setgcref(tabV(o)->metatable, obj2gco(mt));
-    if (mt)
+    if (mt) {
+      if (lj_meta_fast(L, mt, MM_gc))
+        lj_gc_checkfinalizer(L, gcval(o));
       lj_gc_objbarriert(L, tabV(o), mt);
-  } else if (tvisudata(o)) {
-    setgcref(udataV(o)->metatable, obj2gco(mt));
-    if (mt)
-      lj_gc_objbarrier(L, udataV(o), mt);
+    }
   } else {
     /* Flush cache, since traces specialize to basemt. But not during __gc. */
     if (lj_trace_flushall(L))
@@ -1348,46 +1350,52 @@ LUA_API int lua_gc(lua_State *L, int what, int data)
   global_State *g = G(L);
   int res = 0;
   switch (what) {
-  case LUA_GCISRUNNING:
-    res = g->gc.isrunning;
-    break;
-  case LUA_GCSTOP:
-    g->gc.isrunning = 0;
-    g->gc.threshold = LJ_MAX_MEM;
-    break;
-  case LUA_GCRESTART:
-    g->gc.isrunning = 1;
-    g->gc.threshold = data == -1 ? (g->gc.total/100)*g->gc.pause : g->gc.total;
-    break;
-  case LUA_GCCOLLECT:
-    lj_gc_fullgc(L);
-    break;
-  case LUA_GCCOUNT:
-    res = (int)(g->gc.total >> 10);
-    break;
-  case LUA_GCCOUNTB:
-    res = (int)(g->gc.total & 0x3ff);
-    break;
-  case LUA_GCSTEP: {
-    MSize a = (MSize)data << 10;
-    g->gc.threshold = (a <= g->gc.total) ? (g->gc.total - a) : 0;
-    while (g->gc.total >= g->gc.threshold)
-      if (lj_gc_step(L) > 0) {
-	res = 1;
-	break;
+    case LUA_GCISRUNNING:
+      res = (g->gc.flags & GCF_notrunning)==0;
+      break;
+    case LUA_GCSTOP:
+      g->gc.flags |= GCF_notrunning;
+      break;
+    case LUA_GCRESTART:
+      lj_gc_setdebt(g, 0);
+      g->gc.flags &= ~GCF_notrunning;
+      break;
+    case LUA_GCCOLLECT:
+      lj_gc_fullgc(L);
+      break;
+    case LUA_GCCOUNT:
+      res = (int)(gc_gettotalbytes(g) >> 10);
+      break;
+    case LUA_GCCOUNTB:
+      res = (int)(gc_gettotalbytes(g) & 0x3ff);
+      break;
+    case LUA_GCSTEP: {
+        long debt = 1;  /* =1 to signal that it did an actual step */
+        uint8_t oldrunning = g->gc.flags & GCF_notrunning;
+        g->gc.flags &= ~GCF_notrunning;  /* force GC to run */
+        if (data == 0) {
+          lj_gc_setdebt(g, -GCSTEPSIZE);  /* to do a "small" step */
+          lj_gc_step(L);
+        } else {  /* add 'data' to total debt */
+          debt = ((long) data) * 1024 + g->gc.debt;
+          lj_gc_setdebt(g, debt);
+          lj_gc_check(L);
+        }
+        g->gc.flags |= oldrunning;  /* restore previous state */
+        if (debt > 0 && g->gc.state == GCSpause)  /* end of cycle? */
+          res = 1;  /* signal it */
+        break;
       }
-    break;
-  }
-  case LUA_GCSETPAUSE:
-    res = (int)(g->gc.pause);
-    g->gc.pause = (MSize)data;
-    break;
-  case LUA_GCSETSTEPMUL:
-    res = (int)(g->gc.stepmul);
-    g->gc.stepmul = (MSize)data;
-    break;
-  default:
-    res = -1;  /* Invalid option. */
+    case LUA_GCSETPAUSE:
+      res = (int)(g->gc.pause);
+      g->gc.pause = (MSize)data;
+      break;
+    case LUA_GCSETSTEPMUL:
+      res = (int)(g->gc.stepmul);
+      g->gc.stepmul = (MSize)data;
+      break;
+    default:
+      res = -1;  /* Invalid option. */
   }
   return res;
 }
