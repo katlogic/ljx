@@ -1505,17 +1505,17 @@ static void build_subroutines(BuildCtx *ctx)
   |  mov TAB:RB, [BASE]
   |  cmp dword TAB:RB->metatable, 0;  jne ->fff_fallback
   |  cmp dword [BASE+12], LJ_TTAB;  jne ->fff_fallback
-  |  mov TAB:RC, [BASE+8]
+  |  mov TAB:RA, [BASE+8]
   |  // fallback if metatable contains __gc
-  |  test byte TAB:RC->nomm, 1<<MM_gc; jz ->fff_fallback
-  |  mov TAB:RB->metatable, TAB:RC
+  |  test byte TAB:RA->nomm, 1<<MM_gc; jz ->fff_fallback
+  |  mov TAB:RB->metatable, TAB:RA
   |  mov PC, [BASE-4]
   |  mov dword [BASE-4], LJ_TTAB		// Return original table.
   |  mov [BASE-8], TAB:RB
   |  test byte TAB:RB->marked, LJ_GC_BLACK	// isblack(table)
   |  jz >1
   |  // Possible write barrier. Table is black, but skip iswhite(mt) check.
-  |  barrierback TAB:RB, RC
+  |  barrierback TAB:RB, RA
   |1:
   |  jmp ->fff_res1
   |
