@@ -18,6 +18,9 @@
 /* Memory size. */
 typedef uint32_t MSize;
 
+/* Memory size difference */
+typedef int32_t MDiff;
+
 /* Memory reference */
 typedef struct MRef {
   uint32_t ptr32;	/* Pseudo 32 bit pointer. */
@@ -537,14 +540,12 @@ typedef struct GCState {
   uint8_t state;	/* GC state machine. */
   uint8_t nocdatafin;	/* No cdata finalizer called. */
   uint8_t flags;        /* GCF_* */
-
-  MSize stepmul;	/* Incremental GC step granularity. */
   MSize finnum;         /* Number of finalizers to call. */
-  MSize estimate;	/* Estimate of memory actually in use. */
-  MSize pause;		/* Pause between successive GC cycles. */
-
+  MDiff stepmul;	/* Incremental GC step granularity. */
+  MDiff estimate;	/* Estimate of memory actually in use. */
+  MDiff pause;		/* Pause between successive GC cycles. */
   MSize total;
-  long debt;            /* Bytes allocated not yet compensated by the collector */
+  MDiff debt;            /* Bytes allocated not yet compensated by the collector */
 } GCState;
 
 /* Global state, shared by all threads of a Lua universe. */

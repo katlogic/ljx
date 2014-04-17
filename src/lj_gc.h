@@ -85,7 +85,7 @@
 #define markfinalized(x)	((x)->gch.marked |= LJ_GC_FINALIZED)
 
 /* Collector. */
-LJ_FUNC void lj_gc_setdebt(global_State *g, long debt);
+LJ_FUNC void lj_gc_setdebt(global_State *g, MDiff debt);
 LJ_FUNC size_t lj_gc_separateudata(global_State *g, int all);
 LJ_FUNC void lj_gc_checkfinalizer(lua_State *L, GCobj *o);
 LJ_FUNC void lj_gc_finalize_udata(lua_State *L);

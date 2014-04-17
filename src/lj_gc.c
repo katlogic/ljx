@@ -446,7 +446,7 @@ static void gc_traverse_thread(global_State *g, lua_State *th)
   TValue *o, *top = th->top;
   for (o = tvref(th->stack)+1; o < top; o++)
     gc_marktv(g, o);
-  if (g->gc.state == GCSatomic) {
+  if (g->gc.state == GCSinsideatomic) {
     top = tvref(th->stack) + th->stacksize;
     for (; o < top; o++)  /* Clear unmarked slots. */
       setnilV(o);
@@ -767,17 +767,17 @@ void lj_gc_checkfinalizer(lua_State *L, GCobj *o)
 /* -- Collector ----------------------------------------------------------- */
 
 /* Adjust how much memory is owed. */
-void lj_gc_setdebt(global_State *g, long debt)
+void lj_gc_setdebt(global_State *g, MDiff debt)
 {
-//  lua_assert(debt > g->gc.debt);
   g->gc.total -= (debt - g->gc.debt);
   g->gc.debt = debt;
 }
 
 /* Estimate pause to wait between gc cycles. */
-static void gc_setpause(global_State *g, MSize estimate) {
-  long threshold, debt;
+static void gc_setpause(global_State *g, MDiff estimate) {
+  MDiff threshold, debt;
   estimate = estimate / PAUSEADJ;  /* adjust 'estimate' */
+  if (!estimate) estimate++;
   threshold = (g->gc.pause < LJ_MAX_MEM / estimate)  /* overflow? */
             ? estimate * g->gc.pause  /* no overflow */
             : LJ_MAX_MEM;  /* overflow; truncate to maximum */
@@ -819,10 +819,10 @@ void lj_gc_freeall(lua_State *L)
 
 
 /* Atomic part of the GC cycle, transitioning from mark to sweep phase. */
-static long atomic(global_State *g, lua_State *L)
+static MDiff atomic(global_State *g, lua_State *L)
 {
   GCobj *weak_o, *allweak_o;
-  long work = -((long)g->gc.memtrav);  /* start counting work */
+  MDiff work = -((long)g->gc.memtrav);  /* start counting work */
 
   gc_mark_uv(g);  /* Need to remark open upvalues (the thread may be dead). */
   gc_propagate_all(g);  /* Propagate any left-overs. */
@@ -909,8 +909,6 @@ static size_t gc_onestep(lua_State *L)
     }
     case GCSatomic: {
       size_t work, sw;
-      if (tvref(g->jit_base))  /* Don't run atomic phase on trace. */
-        return LJ_MAX_MEM;
       gc_propagate_all(g);
       g->gc.estimate = g->gc.memtrav;  /* save what was counted */;
       work = atomic(g, L);
@@ -958,7 +956,7 @@ int LJ_FASTCALL lj_gc_step(lua_State *L)
 {
   global_State *g = G(L);
   int32_t ostate = g->vmstate;
-  long debt;
+  MDiff debt;
 
   if (g->gc.flags & GCF_notrunning) {
     lj_gc_setdebt(g, -GCSTEPSIZE * 10);
@@ -972,14 +970,14 @@ int LJ_FASTCALL lj_gc_step(lua_State *L)
   setvmstate(g, GC);
 
   do {
+    /* Don't run atomic on trace */
+    if (g->gc.state == GCSatomic && tvref(g->jit_base))
+      break;
     if (g->gc.state == GCScallfin && gcref(g->gc.tobefnz)) {
-      unsigned int n = gc_call_pending_finalizers(L, 1);
+      int n = gc_call_pending_finalizers(L, 1);
       debt -= (n * GCFINALIZECOST);
-#if LJ_HASFFI
-      if (!g->gc.nocdatafin) lj_tab_rehash(L, ctype_ctsG(g)->finalizer);
-#endif
     } else {  /* Perform one single step. */
-      size_t work = gc_onestep(L);
+      MDiff work = gc_onestep(L);
       debt -= work;
     }
   } while (debt > -GCSTEPSIZE && g->gc.state != GCSpause);
@@ -995,7 +993,7 @@ int LJ_FASTCALL lj_gc_step(lua_State *L)
   lj_gc_setdebt(g, debt);
   gc_call_pending_finalizers(L, 1);
   g->vmstate = ostate;
-  return 0;
+  return g->gc.state == GCSatomic ? -1 : 0;
 }
 
 /* Ditto, but fix the stack top first. */
@@ -1010,7 +1008,8 @@ void LJ_FASTCALL lj_gc_step_fixtop(lua_State *L)
 int LJ_FASTCALL lj_gc_step_jit(global_State *g, MSize steps)
 {
   lua_State *L = gco2th(gcref(g->cur_L));
-  L->base = tvref(G(L)->jit_base);
+  global_State *curr_g = g; /* G(L); */
+  L->base = tvref(curr_g->jit_base);
   L->top = curr_topL(L);
   while (steps-- > 0 && lj_gc_step(L) == 0)
     ;
@@ -1032,9 +1031,9 @@ void lj_gc_fullgc(lua_State *L)
        (as white has not changed, nothing will be collected) */
     gc_entersweep(L);
   }
-  while (g->gc.state != GCSpause) lj_gc_step(L); /* Finish previous run */
-  while (g->gc.state == GCSpause) lj_gc_step(L); /* Start collecting */
-  while (g->gc.state != GCSpause) lj_gc_step(L); /* And run */
+  while (g->gc.state != GCSpause) gc_onestep(L); /* Finish previous run */
+  while (g->gc.state == GCSpause) gc_onestep(L); /* Start collecting */
+  while (g->gc.state != GCSpause) gc_onestep(L); /* And run */
   gc_setpause(g, gc_gettotalbytes(g));
   gc_call_pending_finalizers(L, 1);
   g->vmstate = ostate;
@@ -1044,6 +1043,7 @@ void lj_gc_fullgc(lua_State *L)
 /* Call pluggable memory allocator to allocate or resize a fragment. */
 void *lj_mem_realloc(lua_State *L, void *p, MSize osz, MSize nsz)
 {
+  MDiff resize = nsz - osz;
   global_State *g = G(L);
   lua_assert((osz == 0) == (p == NULL));
   p = g->allocf(g->allocd, p, osz, nsz);
@@ -1051,6 +1051,14 @@ void *lj_mem_realloc(lua_State *L, void *p, MSize osz, MSize nsz)
     lj_err_mem(L);
   lua_assert((nsz == 0) == (p == NULL));
   lua_assert(checkptr32(p));
+  /* Clamp debt. TBD: faster. */
+  if (resize >= 0) {
+    if ((MDiff)(g->gc.debt + resize) < g->gc.debt)
+      return p;
+  } else {
+    if ((MDiff)(g->gc.debt + resize) > g->gc.debt)
+      return p;
+  }
   g->gc.debt = (g->gc.debt - osz) + nsz;
   return p;
 }
@@ -1063,10 +1071,13 @@ void * LJ_FASTCALL lj_mem_newgco(lua_State *L, MSize size)
   if (o == NULL)
     lj_err_mem(L);
   lua_assert(checkptr32(o));
-  g->gc.debt += size;
+  lua_assert((MDiff)(g->gc.debt + size) >= g->gc.debt); /* XXX: clamp? */
   setgcrefr(o->gch.nextgc, g->gc.root);
   setgcref(g->gc.root, o);
   newwhite(g, o);
+  /* Clamp debt. */
+  if ((MDiff)(g->gc.debt + size) >= g->gc.debt)
+    g->gc.debt += size;
   return o;
 }
 

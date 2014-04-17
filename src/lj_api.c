@@ -1392,6 +1392,7 @@ LUA_API int lua_gc(lua_State *L, int what, int data)
       break;
     case LUA_GCSETSTEPMUL:
       res = (int)(g->gc.stepmul);
+      if (data < 40) data = 40;  /* avoid ridiculous low values (and 0) */
       g->gc.stepmul = (MSize)data;
       break;
     default:

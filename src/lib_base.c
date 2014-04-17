@@ -446,8 +446,10 @@ LJLIB_CF(collectgarbage)
     "\4stop\7restart\7collect\5count\1\377\4step\10setpause\12setstepmul\1\377\11isrunning");
   int32_t data = lj_lib_optint(L, 2, 0);
   if (opt == LUA_GCCOUNT) {
-    setnumV(L->top++, (lua_Number)G(L)->gc.total/1024.0);
-    setnumV(L->top++, (lua_Number)(G(L)->gc.total%1024));
+    int kb = lua_gc(L, opt, data);
+    int kleft = lua_gc(L, LUA_GCCOUNTB, 0);
+    setnumV(L->top++, kb + ((lua_Number)kleft/1024));
+    setintV(L->top++, kleft);
     return 2;
   } else {
     int res = lua_gc(L, opt, data);
