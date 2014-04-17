@@ -53,7 +53,6 @@
 /* Mark a string object. */
 #define gc_mark_str(s)		((s)->marked &= (uint8_t)~LJ_GC_WHITES)
 
-
 /* -- Write barriers ------------------------------------------------------ */
 
 /* Move the GC propagation frontier forward. */
@@ -197,15 +196,17 @@ static GCRef *findlast (GCRef *p) {
 /* -- Propagation phase --------------------------------------------------- */
 
 /* Check whether we can clear a key or a value slot from a table. */
-static int gc_kv_iscleared(cTValue *o, int val)
+static int iscleared(cTValue *o)
 {
-  UNUSED(val);
-  if (!iscollectable(o)) return 0;
-  if (tvisstr(o)) {
-      gc_mark_str(strV(o));
-      return 0;
+  if (tvisgcv(o)) {
+    if (tvisstr(o)) {
+        gc_mark_str(strV(o));
+        return 0;
+    }
+    if (iswhite(gcV(o)))
+      return 1;
   }
-  return tviswhite(o);
+  return 0;
 }
 
 /* Propagate all gray objects. */
@@ -224,17 +225,20 @@ static void gc_propagate_list(global_State *g, GCobj *l) {
 /* Retraverse objects caught by write barrier. */
 static void gc_retraverse_grays(global_State *g)
 {
-  GCobj *weak_o, *ephemeron_o, *grayagain_o;
-  weak_o = gcref(g->gc.weak);
-  grayagain_o = gcref(g->gc.grayagain);
-  ephemeron_o = gcref(g->gc.ephemeron);
+  GCobj *weak, *ephemeron, *grayagain;
+
+  weak = gcref(g->gc.weak);
+  grayagain = gcref(g->gc.grayagain);
+  ephemeron = gcref(g->gc.ephemeron);
+
   setgcrefnull(g->gc.weak);
   setgcrefnull(g->gc.grayagain);
   setgcrefnull(g->gc.ephemeron);
+
   gc_propagate_all(g);
-  gc_propagate_list(g, grayagain_o);
-  gc_propagate_list(g, weak_o);
-  gc_propagate_list(g, ephemeron_o);
+  gc_propagate_list(g, grayagain);
+  gc_propagate_list(g, weak);
+  gc_propagate_list(g, ephemeron);
 }
 
 static int gc_traverse_ephemeron(global_State *g, GCtab *t) {
@@ -256,7 +260,7 @@ static int gc_traverse_ephemeron(global_State *g, GCtab *t) {
       Node *n = &node[i];
       if (!tvisnil(&n->val)) {  /* Mark non-empty slot. */
 	lua_assert(!tvisnil(&n->key));
-        if (gc_kv_iscleared(&n->key, 0)) {
+        if (iscleared(&n->key)) {
           hasclears = 1;
           if (tviswhite(&n->val))
             prop = 1;
@@ -293,7 +297,7 @@ static void gc_converge_ephemerons(global_State *g)
   } while (changed);
 }
 
-/* Traverse a table. */
+/* Traverse a table, return 1 if weak. */
 static int gc_traverse_tab(global_State *g, GCtab *t)
 {
   cTValue *mode;
@@ -314,12 +318,13 @@ static int gc_traverse_tab(global_State *g, GCtab *t)
         int hasclears = (t->asize>0);
         Node *node = noderef(t->node);
         MSize i, hmask = t->hmask;
+        lua_assert(k == 0 && v == 1);
         for (i = 0; i <= hmask; i++) {
           Node *n = &node[i];
           if (!tvisnil(&n->val)) {  /* Mark non-empty slot. */
             lua_assert(!tvisnil(&n->key));
             gc_marktv(g, &n->key);
-            if (!hasclears && gc_kv_iscleared(&n->val, 1))
+            if (!hasclears && iscleared(&n->val))
               hasclears = 1;
           }
         }
@@ -328,11 +333,13 @@ static int gc_traverse_tab(global_State *g, GCtab *t)
         else
           linktable(t, g->gc.grayagain)
       } else { /* Strong values */
+        lua_assert(k == 1 && v == 0);
         gc_traverse_ephemeron(g, t);
       }
       return 1;
     } else if (k) { /* k == v == 1 */
-      linktable(t, g->gc.weak);
+      lua_assert(k == 1 && v == 1);
+      linktable(t, g->gc.allweak);
       return 1;
     }
   }
@@ -483,7 +490,7 @@ static void gc_propagate_mark(global_State *g)
   } else if (LJ_LIKELY(gct == ~LJ_TTHREAD)) {
     lua_State *th = gco2th(o);
     traversed = sizeof(lua_State) + sizeof(TValue) * th->stacksize;
-    setgcrefr(th->gclist, g->gc.grayagain);
+    setgcrefr(th->gclist, g->gc.grayagain); /* Reinsert into grayagain list. */
     setgcref(g->gc.grayagain, o);
     black2gray(o);  /* Threads are never black. */
     gc_traverse_thread(g, th);
@@ -577,7 +584,7 @@ static void gc_clearvalues(GCobj *o, GCobj *tail)
     for (i = 0; i < asize; i++) {
       /* Clear array slot when value is about to be collected. */
       TValue *tv = arrayslot(t, i);
-      if (gc_kv_iscleared(tv, 1))
+      if (iscleared(tv))
         setnilV(tv);
     }
     if (t->hmask > 0) {
@@ -585,9 +592,10 @@ static void gc_clearvalues(GCobj *o, GCobj *tail)
       MSize i, hmask = t->hmask;
       for (i = 0; i <= hmask; i++) {
 	Node *n = &node[i];
-	/* Clear hash slot when key or value is about to be collected. */
-	if (!tvisnil(&n->val) && (gc_kv_iscleared(&n->val, 1)))
+	/* Clear hash slot when value is marked for collecting. */
+	if (!tvisnil(&n->val) && iscleared(&n->val)) {
 	  setnilV(&n->val);
+        }
       }
     }
     o = gcref(t->gclist);
@@ -604,9 +612,9 @@ static void gc_clearkeys(GCobj *o, GCobj *tail)
       MSize i, hmask = t->hmask;
       for (i = 0; i <= hmask; i++) {
 	Node *n = &node[i];
-	/* Clear hash slot when key or value is about to be collected. */
-	if (!tvisnil(&n->val) && (gc_kv_iscleared(&n->key, 0)))
-	  setnilV(&n->key);
+	/* Clear hash slot when key is marked for collecting. */
+	if (!tvisnil(&n->val) && iscleared(&n->key))
+	  setnilV(&n->val);
       }
     }
     o = gcref(t->gclist);
@@ -850,8 +858,8 @@ static MDiff atomic(global_State *g, lua_State *L)
   weak_o = gcref(g->gc.weak); allweak_o = gcref(g->gc.allweak);
   gc_separate_finalized(g, 0);  /* Separate objects to be finalized. */
   g->gc.finnum = GCFINHEADSTART;
-  gc_mark_finalized(g);
-  gc_propagate_all(g);
+  gc_mark_finalized(g); /* Mark what will be finalized. */
+  gc_propagate_all(g); /* Remark, to propagate 'preserveness'. */
   work -= g->gc.memtrav;  /* Restart counting. */
 
   gc_converge_ephemerons(g);
@@ -960,7 +968,7 @@ int LJ_FASTCALL lj_gc_step(lua_State *L)
 
   if (g->gc.flags & GCF_notrunning) {
     lj_gc_setdebt(g, -GCSTEPSIZE * 10);
-    return 0;
+    return -1;
   }
 
   /* Adjust debt and transition VM to GC state. */ 
@@ -1008,8 +1016,7 @@ void LJ_FASTCALL lj_gc_step_fixtop(lua_State *L)
 int LJ_FASTCALL lj_gc_step_jit(global_State *g, MSize steps)
 {
   lua_State *L = gco2th(gcref(g->cur_L));
-  global_State *curr_g = g; /* G(L); */
-  L->base = tvref(curr_g->jit_base);
+  L->base = tvref(G(L)->jit_base);
   L->top = curr_topL(L);
   while (steps-- > 0 && lj_gc_step(L) == 0)
     ;
