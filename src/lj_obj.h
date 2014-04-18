@@ -580,6 +580,7 @@ typedef struct global_State {
   MRef ctype_state;	/* Pointer to C type state. */
   GCRef gcroot[GCROOT_MAX];  /* GC roots. */
   MatchState ms;        /* Capture buffer for JIT mcode. */
+  const void *cframe_limit; /* CPU stack overflows below this. */
   const lua_Number *version;
 } global_State;
 

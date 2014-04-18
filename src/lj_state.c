@@ -145,6 +145,10 @@ static TValue *cpluaopen(lua_State *L, lua_CFunction dummy, void *ud)
   UNUSED(ud);
   stack_init(L, L);
 
+  lua_assert(L->cframe);
+  /* TBD: XARCH - assume stack grows down for now */
+  g->cframe_limit = L->cframe - LUAI_MAXCFRAME;
+
   /* Init strings and lexer. */
   lj_str_resize(L, LJ_MIN_STRTAB-1);
   lj_meta_init(L);

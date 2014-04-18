@@ -180,4 +180,7 @@ enum {
 #define cframe_raw(cf)		((void *)((intptr_t)(cf) & CFRAME_RAWMASK))
 #define cframe_Lpc(L)		cframe_pc(cframe_raw(L->cframe))
 
+/* TBD: Put this in every place where C stack might overflow. */
+#define cframe_check(L) { if (L->cframe && (L->cframe < G(L)->cframe_limit)) lj_err_msg(L, LJ_ERR_CSTKOV); }
+
 #endif

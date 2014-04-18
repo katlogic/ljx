@@ -34,6 +34,7 @@
 #include "lj_strscan.h"
 #include "lj_strfmt.h"
 #include "lj_lib.h"
+#include "lj_frame.h"
 
 /* -- Base library: checks ------------------------------------------------ */
 
@@ -629,6 +630,7 @@ static void setpc_wrap_aux(lua_State *L, GCfunc *fn);
 LJLIB_CF(coroutine_wrap)
 {
   GCfunc *fn;
+  cframe_check(L); /* TBD: This should be implicit somehow. */
   lj_cf_coroutine_create(L);
   fn = lj_lib_pushcc(L, lj_ffh_coroutine_wrap_aux, FF_coroutine_wrap_aux, 1);
   setpc_wrap_aux(L, fn);
