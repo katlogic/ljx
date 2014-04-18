@@ -151,7 +151,6 @@ GCfunc *lj_func_newL_empty(lua_State *L, GCproto *pt, GCtab *env)
 {
   GCfunc *fn = func_newL(L, pt, env);
   MSize i, nuv = pt->sizeuv;
-  /* NOBARRIER: The GCfunc is new (marked white). */
   for (i = 0; i < nuv; i++) {
     GCupval *uv = func_emptyuv(L);
     uint32_t v = proto_uv(pt)[i];
@@ -162,7 +161,9 @@ GCfunc *lj_func_newL_empty(lua_State *L, GCproto *pt, GCtab *env)
     }
     uv->flags = flags;
     uv->dhash = (uint32_t)(uintptr_t)pt ^ ((uint32_t)proto_uv(pt)[i] << 24);
+    /* NOBARRIER: The GCfunc is new (marked white). */
     setgcref(fn->l.uvptr[i], obj2gco(uv));
+    /* TBD: sub-closures and env barriers? */
     if (flags == UV_ENV) {
       settabV(L, &uv->tv, env);
     } else if (flags == UV_CLOSURE)
@@ -187,6 +188,7 @@ static GCfunc *lj_func_newL(lua_State *L, GCproto *pt, GCfuncL *parent)
   base = L->base;
 
   fn->l.nupvalues = 0;
+  /* TBD: sub-closures and env barriers? */
   for (i = 0; i < nuv; i++) {
     uint32_t v = proto_uv(pt)[i];
     GCupval *uv;
@@ -238,6 +240,7 @@ void LJ_FASTCALL lj_func_free(global_State *g, GCfunc *fn)
 {
   MSize size = isluafunc(fn) ? sizeLfunc((MSize)fn->l.nupvalues) :
 			       sizeCfunc((MSize)fn->c.nupvalues);
+  /* NOBARRIER: Should be handled in ESETV/lua_setupvalue. */
   if (isluafunc(fn)) {
     setgcrefr(gcref(fn->l.next_ENV)->fn.l.prev_ENV, fn->l.prev_ENV);
     setgcrefr(gcref(fn->l.prev_ENV)->fn.l.next_ENV, fn->l.next_ENV);

@@ -4224,7 +4224,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |.endif
     |  ins_next
     break;
-  case BC_ESETV:
+  case BC_ESETV: // TBD: NOBARRIER?
     |  ins_AD
     |  checktp RD, LJ_TTAB
     |  mov RD, [BASE+RD*8] // val to assign

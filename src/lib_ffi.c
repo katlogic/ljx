@@ -690,6 +690,7 @@ LJLIB_CF(ffi_strbuf)	LJLIB_REC(.)
   lua_assert(((ptrdiff_t)s) <= 0xffffffff);
   s->marked = LJ_GC_FIXED | LJ_GC_SFIXED;
   s->gct = ~LJ_TSTR;
+  /* NOBARRIER: not actually tracked by GC. */
   setgcrefnull(obj2gco(s)->gch.nextgc);
   setstrV(L, o, s);
   setitype(o, LJ_TSTR);
