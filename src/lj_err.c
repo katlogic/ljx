@@ -486,6 +486,17 @@ LJ_NOINLINE GCstr *lj_err_str(lua_State *L, ErrMsg em)
   return lj_str_newz(L, err2msg(em));
 }
 
+/* Push formatted error message. */
+LJ_NOINLINE void lj_err_pushv(lua_State *L, ErrMsg em, ...)
+{
+  va_list argp;
+  va_start(argp, em);
+  if (curr_funcisL(L)) L->top = curr_topL(L);
+  lj_strfmt_pushvf(L, err2msg(em), argp);
+  va_end(argp);
+}
+
+
 /* Out-of-memory error. */
 LJ_NOINLINE void lj_err_mem(lua_State *L)
 {
@@ -585,6 +596,7 @@ LJ_NOINLINE void lj_err_msg(lua_State *L, ErrMsg em)
 {
   err_msgv(L, em);
 }
+
 
 /* Lexer error. */
 LJ_NOINLINE void lj_err_lex(lua_State *L, GCstr *src, const char *tok,

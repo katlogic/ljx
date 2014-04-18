@@ -119,7 +119,7 @@ ERRDEF(NOJIT,	"JIT compiler permanently disabled by build option")
 ERRDEF(JITOPT,	"unknown or malformed optimization flag " LUA_QS)
 
 /* Lexer/parser errors. */
-ERRDEF(XMODE,	"attempt to load chunk with wrong mode")
+ERRDEF(XMODE,   "attempt to load a %s chunk (mode is " LUA_QS ")")
 ERRDEF(XNEAR,	"%s near " LUA_QS)
 ERRDEF(XLINES,	"chunk has too many lines")
 ERRDEF(XLEVELS,	"chunk has too many syntax levels")

@@ -37,5 +37,6 @@ LJ_FUNC_NORET void lj_err_arg(lua_State *L, int narg, ErrMsg em);
 LJ_FUNC_NORET void lj_err_argv(lua_State *L, int narg, ErrMsg em, ...);
 LJ_FUNC_NORET void lj_err_argtype(lua_State *L, int narg, const char *xname);
 LJ_FUNC_NORET void lj_err_argt(lua_State *L, int narg, int tt);
+LJ_FUNC void lj_err_pushv(lua_State *L, ErrMsg em, ...);
 
 #endif
