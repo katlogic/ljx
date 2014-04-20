@@ -20,14 +20,13 @@ GCudata *lj_udata_new(lua_State *L, MSize sz, GCtab *env)
   ud->len = sz;
   /* NOBARRIER: The GCudata is new (marked white). */
   setgcrefnull(ud->metatable);
-  /* Lua 5.1 sets caller's env, 5.2 sets nil. */
-#if LJ_51
-  setgcref(ud->env, obj2gco(env));
-  ud->envtt = ~LJ_TTAB;
-#else
-  setgcrefnull(ud->env);
-  ud->envtt = ~LJ_TNIL;
-#endif
+  if (env) {
+    setgcref(ud->env, obj2gco(env));
+    ud->envtt = ~LJ_TTAB;
+  } else {
+    setgcrefnull(ud->env);
+    ud->envtt = ~LJ_TNIL;
+  }
   return ud;
 }
 

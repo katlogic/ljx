@@ -795,7 +795,7 @@ static LJ_AINLINE void setgcV(lua_State *L, TValue *o, GCobj *v, uint32_t itype)
   iu->env = io->it; io->envtt = io->tt; tvchecklive(L, io) }
 
 #define getuservalue(L,u,o) \
-  setgcV(L, o, gcref(u->env), u->envtt)
+  setgcV(L, o, gcref(u->env), ~u->envtt)
 
 
 #define define_setV(name, type, tag) \
