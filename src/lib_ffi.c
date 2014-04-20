@@ -771,8 +771,20 @@ LJLIB_CF(ffi_metatype)
   TValue *tv;
   GCcdata *cd;
   if (!(ctype_isstruct(ct->info) || ctype_iscomplex(ct->info) ||
-	ctype_isvector(ct->info)))
+	ctype_isvector(ct->info) || ctype_isnum(ct->info)))
     lj_err_arg(L, 1, LJ_ERR_FFI_INVTYPE);
+  if (ctype_isnum(ct->info)) { /* Duplicate it. */
+    CType *nct;
+    id = lj_ctype_new(cts, &nct);
+    /* Copy fields. */
+    nct->info = ct->info;
+    nct->size = ct->size;
+    nct->sib = ct->sib;
+    nct->next = ct->next;
+    /* For repr; abstract name always refers to the original. */
+    setgcrefr(nct->name, ct->name);
+    ct = nct; 
+  }
   tv = lj_tab_setinth(L, t, -(int32_t)id);
   if (!tvisnil(tv))
     lj_err_caller(L, LJ_ERR_PROTMT);
