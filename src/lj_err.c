@@ -600,15 +600,14 @@ LJ_NOINLINE void lj_err_msg(lua_State *L, ErrMsg em)
 
 /* Lexer error. */
 LJ_NOINLINE void lj_err_lex(lua_State *L, GCstr *src, const char *tok,
-			    BCLine line, ErrMsg em, va_list argp)
+			    BCLine line, ErrMsg em, va_list argp, int quote)
 {
   char buff[LUA_IDSIZE];
   const char *msg;
   lj_debug_shortname(buff, src, line);
   msg = lj_strfmt_pushvf(L, err2msg(em), argp);
   msg = lj_strfmt_pushf(L, "%s:%d: %s", buff, line, msg);
-  if (tok)
-    lj_strfmt_pushf(L, err2msg(LJ_ERR_XNEAR), msg, tok);
+  lj_strfmt_pushf(L, err2msg(quote?LJ_ERR_XNEARQ:LJ_ERR_XNEAR), msg, tok);
   lj_err_throw(L, LUA_ERRSYNTAX);
 }
 

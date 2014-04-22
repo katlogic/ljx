@@ -242,7 +242,7 @@ static const char *match(MatchState *ms, const char *s, const char *p);
 static const char *matchbalance(MatchState *ms, const char *s, const char *p)
 {
   if (p >= ms->p_end - 1)
-    lj_err_caller(ms->L, LJ_ERR_STRPATU);
+    lj_err_callerv(ms->L, LJ_ERR_STRPATPB);
   if (*s != *p) {
     return NULL;
   } else {

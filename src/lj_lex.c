@@ -205,12 +205,14 @@ static void lex_string(LexState *ls, TValue *tv)
       case 'x':  /* Hexadecimal escape '\xXX'. */
 	c = (lex_next(ls) & 15u) << 4;
 	if (!lj_char_isdigit(ls->c)) {
-	  if (!lj_char_isxdigit(ls->c)) goto err_xesc;
+	  if (!lj_char_isxdigit(ls->c))
+	    lj_lex_error(ls, TK_string, LJ_ERR_XHEX);
 	  c += 9 << 4;
 	}
 	c += (lex_next(ls) & 15u);
 	if (!lj_char_isdigit(ls->c)) {
-	  if (!lj_char_isxdigit(ls->c)) goto err_xesc;
+	  if (!lj_char_isxdigit(ls->c))
+	    lj_lex_error(ls, TK_string, LJ_ERR_XHEX);
 	  c += 9;
 	}
 	break;
@@ -445,7 +447,7 @@ const char *lj_lex_token2str(LexState *ls, LexToken tok)
   if (tok > TK_OFS)
     return tokennames[tok-TK_OFS-1];
   else if (!lj_char_iscntrl(tok))
-    return lj_strfmt_pushf(ls->L, "%c", tok);
+    return lj_strfmt_pushf(ls->L, LUA_QL("%c"), tok);
   else
     return lj_strfmt_pushf(ls->L, "char(%d)", tok);
 }
@@ -464,7 +466,7 @@ void lj_lex_error(LexState *ls, LexToken tok, ErrMsg em, ...)
     tokstr = lj_lex_token2str(ls, tok);
   }
   va_start(argp, em);
-  lj_err_lex(ls->L, ls->chunkname, tokstr, ls->linenumber, em, argp);
+  lj_err_lex(ls->L, ls->chunkname, tokstr, ls->linenumber, em, argp, tok == TK_string);
   va_end(argp);
 }
 
