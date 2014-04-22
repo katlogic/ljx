@@ -1447,8 +1447,8 @@ static void fs_fixup_uv1(FuncState *fs, GCproto *pt, uint16_t *uv)
     return;
 
   
-  while (p->prev &&
-      p->prev->prev /* TBD: Solve xpcall/coroutine regression when p->prev has lifted closure */
+  while (p->prev
+      && p->prev->prev /* TBD: Solve xpcall/coroutine regression when p->prev has lifted closure */
       ) {
     /* check */
     for (i = 0; i < nuv; i++) {
@@ -2225,13 +2225,12 @@ static void expr_next(LexState *ls)
 }
 
 /* Parse conditional expression. */
-static BCPos expr_cond(LexState *ls)
+static BCPos expr_cond(LexState *ls, ExpDesc *e)
 {
-  ExpDesc v;
-  expr(ls, &v);
-  if (v.k == VKNIL) v.k = VKFALSE;
-  bcemit_branch_t(ls->fs, &v);
-  return v.f;
+  expr(ls, e);
+  if (e->k == VKNIL) e->k = VKFALSE;
+  bcemit_branch_t(ls->fs, e);
+  return e->f;
 }
 
 /* -- Assignments --------------------------------------------------------- */
@@ -2513,15 +2512,24 @@ static void parse_block(LexState *ls)
 /* Parse 'while' statement. */
 static void parse_while(LexState *ls, BCLine line)
 {
+  ExpDesc e;
   FuncState *fs = ls->fs;
   BCPos start, loop, condexit;
   FuncScope bl;
   lj_lex_next(ls);  /* Skip 'while'. */
   start = fs->lasttarget = fs->pc;
-  condexit = expr_cond(ls);
+  condexit = expr_cond(ls, &e);
   fscope_begin(fs, &bl, FSCOPE_LOOP);
   lex_check(ls, TK_do);
   loop = bcemit_AD(fs, BC_LOOP, fs->nactvar, 0);
+#if LJ_KLUDGES
+  /* Horrible kludge to emulate Lua UB - wipe out temporary of condexpr,
+   * because Lua VM triggers gc step after (possible) overwrite,
+   * but luajit does so before.
+   * CAVEAT: e is already freed by bcemit_branch. */
+  if (e.k == VNONRELOC)
+    bcemit_INS(ls->fs, BCINS_AD(BC_KPRI, e.u.s.info, VKNIL));
+#endif
   parse_block(ls);
   jmp_patch(fs, bcemit_jmp(fs), start);
   lex_match(ls, TK_end, TK_while, line);
@@ -2533,6 +2541,7 @@ static void parse_while(LexState *ls, BCLine line)
 /* Parse 'repeat' statement. */
 static void parse_repeat(LexState *ls, BCLine line)
 {
+  ExpDesc e;
   FuncState *fs = ls->fs;
   BCPos loop = fs->lasttarget = fs->pc;
   BCPos condexit;
@@ -2543,7 +2552,7 @@ static void parse_repeat(LexState *ls, BCLine line)
   bcemit_AD(fs, BC_LOOP, fs->nactvar, 0);
   parse_chunk(ls);
   lex_match(ls, TK_until, TK_repeat, line);
-  condexit = expr_cond(ls);  /* Parse condition (still inside inner scope). */
+  condexit = expr_cond(ls, &e);  /* Parse condition (still inside inner scope). */
   if (!(bl2.flags & FSCOPE_UPVAL)) {  /* No upvalues? Just end inner scope. */
     fscope_end(fs);
   } else {  /* Otherwise generate: cond: UCLO+JMP out, !cond: UCLO+JMP loop. */
@@ -2693,9 +2702,10 @@ static void parse_for(LexState *ls, BCLine line)
 /* Parse condition and 'then' block. */
 static BCPos parse_then(LexState *ls)
 {
+  ExpDesc e;
   BCPos condexit;
   lj_lex_next(ls);  /* Skip 'if' or 'elseif'. */
-  condexit = expr_cond(ls);
+  condexit = expr_cond(ls, &e);
   lex_check(ls, TK_then);
   parse_block(ls);
   return condexit;

@@ -373,6 +373,14 @@
 #define LJ_HASFFI		1
 #endif
 
+/* Disable or enable emulation of Undefined Behavior workarounds. */
+#if defined(LUAJIT_DISABLE_UBKLUDGES)
+#define LJ_KLUDGES              0
+#else
+#define LJ_KLUDGES              1
+#endif
+
+
 #if defined(LUAJIT_DISABLE_PROFILE)
 #define LJ_HASPROFILE		0
 #elif LJ_TARGET_POSIX

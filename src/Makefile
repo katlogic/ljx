@@ -106,6 +106,12 @@ XCFLAGS=
 # Note: this does not provide full compatibility with Lua 5.1 at this time.
 #XCFLAGS+= -DLUAJIT_ENABLE_LUA51COMPAT
 #
+# This flag disables various kludges to emulate Lua Undefined/Underspecified
+# Behavior. Normally this is needef for so buggy scripts to continue to work,
+# but incurs small performance penalty. Think clang emulating gcc UBs
+# to make life easier.
+# XCFLAGS+= -DLUAJIT_DISABLE_UBKLUDGES
+#
 # Disable the JIT compiler, i.e. turn LuaJIT into a pure interpreter.
 #XCFLAGS+= -DLUAJIT_DISABLE_JIT
 #
