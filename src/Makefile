@@ -107,7 +107,7 @@ XCFLAGS=
 #XCFLAGS+= -DLUAJIT_ENABLE_LUA51COMPAT
 #
 # This flag disables various kludges to emulate Lua Undefined/Underspecified
-# Behavior. Normally this is needef for so buggy scripts to continue to work,
+# Behavior. Normally this is needed so buggy scripts continue to work,
 # but incurs small performance penalty. Think clang emulating gcc UBs
 # to make life easier.
 # XCFLAGS+= -DLUAJIT_DISABLE_UBKLUDGES
