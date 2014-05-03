@@ -717,6 +717,12 @@ LUA_API void lua_pushlightuserdata(lua_State *L, void *p)
   incr_top(L);
 }
 
+LUA_API void lua_pushuserdata_native(lua_State *L, void *p)
+{
+  setudataV(L, L->top, checklightudptr(L, p)); /* Checks 1<<47 range, not type. */
+  incr_top(L);
+}
+
 LUA_API void lua_createtable(lua_State *L, int narray, int nrec)
 {
   lj_gc_check(L);
