@@ -242,15 +242,22 @@ static void LJ_FASTCALL recff_setmetatable(jit_State *J, RecordFFData *rd)
 
 static void LJ_FASTCALL recff_debug_getmetatable(jit_State *J, RecordFFData *rd)
 {
+  GCtab *mt;
+  TRef mtref;
   TRef tr = J->base[0];
   if (tref_istab(tr)) {
-    GCtab *mt = tabref(tabV(&rd->argv[0])->metatable);
-    TRef mtref = emitir(IRT(IR_FLOAD, IRT_TAB), tr, IRFL_TAB_META);
-    emitir(IRTG(mt ? IR_NE : IR_EQ, IRT_TAB), mtref, lj_ir_knull(J, IRT_TAB));
-    J->base[0] = mt ? mtref : TREF_NIL;
+    mt = tabref(tabV(&rd->argv[0])->metatable);
+    mtref = emitir(IRT(IR_FLOAD, IRT_TAB), tr, IRFL_TAB_META);
+  } else if (tref_isudata(tr)) {
+    mt = tabref(udataV(&rd->argv[0])->metatable);
+    mtref = emitir(IRT(IR_FLOAD, IRT_TAB), tr, IRFL_UDATA_META);
   } else {
-    recff_nyiu(J, rd);
+    mt = tabref(basemt_obj(J2G(J), &rd->argv[0]));
+    J->base[0] = mt ? lj_ir_ktab(J, mt) : TREF_NIL;
+    return;
   }
+  emitir(IRTG(mt ? IR_NE : IR_EQ, IRT_TAB), mtref, lj_ir_knull(J, IRT_TAB));
+  J->base[0] = mt ? mtref : TREF_NIL;
 }
 
 
