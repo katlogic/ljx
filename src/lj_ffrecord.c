@@ -240,6 +240,40 @@ static void LJ_FASTCALL recff_setmetatable(jit_State *J, RecordFFData *rd)
   }  /* else: Interpreter will throw. */
 }
 
+static void LJ_FASTCALL recff_debug_getmetatable(jit_State *J, RecordFFData *rd)
+{
+  TRef tr = J->base[0];
+  if (tref_istab(tr)) {
+    GCtab *mt = tabref(tabV(&rd->argv[0])->metatable);
+    TRef mtref = emitir(IRT(IR_FLOAD, IRT_TAB), tr, IRFL_TAB_META);
+    emitir(IRTG(mt ? IR_NE : IR_EQ, IRT_TAB), mtref, lj_ir_knull(J, IRT_TAB));
+    J->base[0] = mt ? mtref : TREF_NIL;
+  } else {
+    recff_nyiu(J, rd);
+  }
+}
+
+
+static void LJ_FASTCALL recff_debug_setmetatable(jit_State *J, RecordFFData *rd)
+{
+  TRef tr = J->base[0];
+  TRef mt = J->base[1];
+  /* Note: lua_setmetatable for base_mt provides no benefit. */
+  if (tref_istab(tr) && (tref_istab(mt) || (mt && tref_isnil(mt)))) {
+    TRef fref, mtref;
+    fref = emitir(IRT(IR_FREF, IRT_P32), tr, IRFL_TAB_META);
+    mtref = tref_isnil(mt) ? lj_ir_knull(J, IRT_TAB) : mt;
+    emitir(IRT(IR_FSTORE, IRT_TAB), fref, mtref);
+    if (!tref_isnil(mt))
+      emitir(IRT(IR_TBAR, IRT_TAB), tr, 0);
+    J->base[0] = tr;
+    J->needsnap = 1;
+  } else {
+    recff_nyiu(J, rd);
+  }
+}
+
+
 static void LJ_FASTCALL recff_rawget(jit_State *J, RecordFFData *rd)
 {
   RecordIndex ix;
