@@ -157,8 +157,10 @@ static void gc_mark_gcroot(global_State *g)
 static void gc_mark_finalized(global_State *g)
 {
   GCobj *o;
-  for (o = gcref(g->gc.tobefnz); o; o = gcnext(o))
+  for (o = gcref(g->gc.tobefnz); o; o = gcnext(o)) {
+      makewhite(g, o);
       gc_mark(g, o);
+  }
 }
 
 /* Start a GC cycle and mark the root set. */
