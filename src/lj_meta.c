@@ -217,7 +217,7 @@ TValue *lj_meta_arith(lua_State *L, TValue *ra, cTValue *rb, cTValue *rc,
   /* ORDER MM, MM_shr expected last arith. */
   lua_assert(mm >= MM_add && mm <= MM_shr);
   /* Bit/integer operators are funelled to FFI bit arith. */
-  if (mm >= MM_idiv) {
+  if (mm >= MM_bnot) {
     /* TBD: This is super clunky, perhaps rewrite with no dep on FFI? */
     CTypeID idb, idc, id = CTID_INT64;
     TValue dummyb = *rb;
@@ -226,15 +226,16 @@ TValue *lj_meta_arith(lua_State *L, TValue *ra, cTValue *rb, cTValue *rc,
     idb = idc = 0;
     vb = lj_carith_check64_raw(L, rb, &dummyb, &idb);
     if (idb != -1) {
-      if (op == MM_unm && op != MM_bnot)
+      if ((mm != MM_unm) && (mm != MM_bnot))
         vc = lj_carith_check64_raw(L, rc, &dummyc, &idc);
     }
     if (idb != -1 && idc != -1) {
       if (idb == CTID_UINT64)
         id = idb;
-      else if ((op != MM_unm) && (op != MM_bnot) && (idc == CTID_UINT64))
+      else if ((mm != MM_unm) && (mm != MM_bnot) && (idc == CTID_UINT64))
         id = idc;
       lj_carith_int64(L, ra, id, vb, vc, mm);
+      return NULL;
     }
     /* Continues with lj_meta_lookup. */
   } else if ((b = str2num(rb, &tempb)) != NULL &&

@@ -322,7 +322,7 @@ int lj_carith_int64(lua_State *L, TValue *res, CTypeID id, uint64_t u0, uint64_t
       *up = lj_carith_powu64(u0, u1);
     break;
   case MM_unm: *up = (uint64_t)-(int64_t)u0; break;
-  case MM_bnot: *up = (uint64_t)~(int64_t)u0; break;
+  case MM_bnot: *up = ~u0; break;
   default: lua_assert(0); break;
   }
   return 1;
