@@ -155,9 +155,10 @@ typedef struct FuncState {
 /* Binary and unary operators. ORDER OPR */
 typedef enum BinOpr {
   OPR_ADD, OPR_SUB, OPR_MUL, OPR_DIV, OPR_MOD, OPR_POW,  /* ORDER ARITH */
+  OPR_IDIV, OPR_BAND, OPR_BOR, OPR_BXOR, OPR_SHL, OPR_SHR, /* ORDER IOPR */
   OPR_CONCAT,
-  OPR_NE, OPR_EQ,
-  OPR_LT, OPR_GE, OPR_LE, OPR_GT,
+  OPR_NE, OPR_EQ, OPR_LT, OPR_GE,
+  OPR_LE, OPR_GT,
   OPR_AND, OPR_OR,
   OPR_NOBINOPR
 } BinOpr;
@@ -777,6 +778,7 @@ static int foldarith(BinOpr opr, ExpDesc *e1, ExpDesc *e2)
 {
   TValue o;
   lua_Number n;
+  if (opr >= OPR_IDIV) return 0;
   if (!expr_isnumk_nojump(e1) || !expr_isnumk_nojump(e2)) return 0;
   n = lj_vm_foldarith(expr_numberV(e1), expr_numberV(e2), (int)opr-OPR_ADD);
   setnumV(&o, n);
@@ -801,6 +803,10 @@ static void bcemit_arith(FuncState *fs, BinOpr opr, ExpDesc *e1, ExpDesc *e2)
     return;
   if (opr == OPR_POW) {
     op = BC_POW;
+    rc = expr_toanyreg(fs, e2);
+    rb = expr_toanyreg(fs, e1);
+  } else if (opr >= OPR_IDIV) {
+    op = opr - OPR_IDIV + BC_IDIV;
     rc = expr_toanyreg(fs, e2);
     rb = expr_toanyreg(fs, e1);
   } else {
@@ -894,7 +900,7 @@ static void bcemit_binop_left(FuncState *fs, BinOpr op, ExpDesc *e)
 /* Emit binary operator. */
 static void bcemit_binop(FuncState *fs, BinOpr op, ExpDesc *e1, ExpDesc *e2)
 {
-  if (op <= OPR_POW) {
+  if (op <= OPR_SHR) {
     bcemit_arith(fs, op, e1, e2);
   } else if (op == OPR_AND) {
     lua_assert(e1->t == NO_JMP);  /* List must be closed. */
@@ -2149,7 +2155,13 @@ static BinOpr token2binop(LexToken tok)
   case TK_ge:	return OPR_GE;
   case TK_and:	return OPR_AND;
   case TK_or:	return OPR_OR;
-  default:	return OPR_NOBINOPR;
+  case TK_idiv: return OPR_IDIV;
+  case '&':     return OPR_BAND;
+  case '|':     return OPR_BOR;
+  case '~':     return OPR_BXOR;
+  case TK_shl:  return OPR_SHL;
+  case TK_shr:  return OPR_SHR;
+  default:      return OPR_NOBINOPR;
   }
 }
 
@@ -2158,11 +2170,16 @@ static const struct {
   uint8_t left;		/* Left priority. */
   uint8_t right;	/* Right priority. */
 } priority[] = {
-  {6,6}, {6,6}, {7,7}, {7,7}, {7,7},	/* ADD SUB MUL DIV MOD */
-  {10,9}, {5,4},			/* POW CONCAT (right associative) */
-  {3,3}, {3,3},				/* EQ NE */
-  {3,3}, {3,3}, {3,3}, {3,3},		/* LT GE GT LE */
-  {2,2}, {1,1}				/* AND OR */
+  {10, 10}, {10, 10},           /* '+' '-' */
+  {11, 11}, {11, 11}, {11,11},  /* '*' '/' '%' */
+  {14, 13},                     /* '^' (right associative) */
+  {11, 11}, {11, 11},           /* '//' */
+  {6, 6}, {4, 4}, {5, 5},       /* '&' '|' '~' */
+  {7, 7}, {7, 7},               /* '<<' '>>' */
+  {9, 8},                       /* '..' (right associative) */
+  {3, 3}, {3, 3}, {3, 3},       /* ~=, ==, <, >= */
+  {3, 3}, {3, 3}, {3, 3},       /* <=, >, */
+  {2, 2}, {1, 1}                /* and, or */
 };
 
 #define UNARY_PRIORITY		8  /* Priority for unary operators. */
@@ -2180,6 +2197,8 @@ static void expr_unop(LexState *ls, ExpDesc *v)
     op = BC_UNM;
   } else if (ls->tok == '#') {
     op = BC_LEN;
+  } else if (ls->tok == '~') {
+    op = BC_BNOT;
   } else {
     expr_simple(ls, v);
     return;

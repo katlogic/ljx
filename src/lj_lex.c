@@ -59,6 +59,15 @@ static LJ_AINLINE LexChar lex_next(LexState *ls)
   return (ls->c = ls->p < ls->pe ? (LexChar)(uint8_t)*ls->p++ : lex_more(ls));
 }
 
+static LJ_AINLINE int check(LexState *ls, LexChar c)
+{
+  if (ls->c == c) {
+    lex_next(ls);
+    return 1;
+  }
+  return 0;
+}
+
 /* Save character. */
 static LJ_AINLINE void lex_save(LexState *ls, LexChar c)
 {
@@ -321,19 +330,30 @@ static LexToken lex_scan(LexState *ls, TValue *tv)
       }
     case '=':
       lex_next(ls);
-      if (ls->c != '=') return '='; else { lex_next(ls); return TK_eq; }
+      if (check(ls, '=')) return TK_eq;
+      return '=';
     case '<':
       lex_next(ls);
-      if (ls->c != '=') return '<'; else { lex_next(ls); return TK_le; }
+      if (check(ls, '=')) return TK_le;
+      if (check(ls, '<')) return TK_shl;
+      return '<';
     case '>':
       lex_next(ls);
-      if (ls->c != '=') return '>'; else { lex_next(ls); return TK_ge; }
+      if (check(ls, '=')) return TK_ge;
+      if (check(ls, '>')) return TK_shr;
+      return '>';
+    case '/':
+      lex_next(ls);
+      if (check(ls, '/')) return TK_idiv;
+      return '/';
     case '~':
       lex_next(ls);
-      if (ls->c != '=') return '~'; else { lex_next(ls); return TK_ne; }
+      if (check(ls, '=')) return TK_ne;
+      return '~';
     case ':':
       lex_next(ls);
-      if (ls->c != ':') return ':'; else { lex_next(ls); return TK_label; }
+      if (check(ls, ':')) return TK_label;
+      return ':';
     case '"':
     case '\'':
       lex_string(ls, tv);

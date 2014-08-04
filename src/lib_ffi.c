@@ -275,6 +275,41 @@ LJLIB_CF(ffi_meta___unm)	LJLIB_REC(cdata_arith MM_unm)
 {
   return ffi_arith(L);
 }
+
+LJLIB_CF(ffi_meta___bnot)       LJLIB_REC(cdata_arith MM_bnot)
+{
+  return ffi_arith(L);
+}
+
+LJLIB_CF(ffi_meta___idiv)       LJLIB_REC(cdata_arith MM_idiv)
+{
+  return ffi_arith(L);
+}
+
+LJLIB_CF(ffi_meta___band)       LJLIB_REC(cdata_arith MM_band)
+{
+  return ffi_arith(L);
+}
+
+LJLIB_CF(ffi_meta___bor)       LJLIB_REC(cdata_arith MM_bor)
+{
+  return ffi_arith(L);
+}
+
+LJLIB_CF(ffi_meta___bxor)       LJLIB_REC(cdata_arith MM_bxor)
+{
+  return ffi_arith(L);
+}
+LJLIB_CF(ffi_meta___shl)       LJLIB_REC(cdata_arith MM_shl)
+{
+  return ffi_arith(L);
+}
+
+LJLIB_CF(ffi_meta___shr)       LJLIB_REC(cdata_arith MM_shr)
+{
+  return ffi_arith(L);
+}
+
 /* End of contiguous ORDER MM. */
 
 LJLIB_CF(ffi_meta___tostring)

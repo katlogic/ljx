@@ -187,6 +187,15 @@
   _(ESETV,	uv,	___,	var,	___) \
   _(USETV,	uv,	___,	var,	___) \
   \
+  /* ORDER IOPR, preceding BNOT expected for ORDER MM */ \
+  _(BNOT,	dst,	___,	var,	bnot) \
+  _(IDIV,	dst,	var,	var,	idiv) \
+  _(BAND,	dst,	var,	var,	band) \
+  _(BOR,	dst,	var,	var,	bor) \
+  _(BXOR,	dst,	var,	var,	bxor) \
+  _(SHL,	dst,	var,	var,	shl) \
+  _(SHR,	dst,	var,	var,	shr) \
+  \
   /* Function headers. I/J = interp/JIT, F/V/C = fixarg/vararg/C func. */ \
   _(FUNCF,	rbase,	___,	___,	___) \
   _(IFUNCF,	rbase,	___,	___,	___) \

@@ -1186,7 +1186,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  xchg RB, RC
   |  jmp >2
   |
-  |->vmeta_unm:
+  |->vmeta_arith_unary:
   |  lea RC, [BASE+RD*8]
   |  mov RB, RC
   |  jmp >2
@@ -3943,9 +3943,9 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  mov dword [BASE+RA*8], 0
     |  jmp <9
     |5:
-    |  ja ->vmeta_unm
+    |  ja ->vmeta_arith_unary
     |.else
-    |  checknum RD, ->vmeta_unm
+    |  checknum RD, ->vmeta_arith_unary
     |.endif
     |  movsd xmm0, qword [BASE+RD*8]
     |  sseconst_sign xmm1, RDa
@@ -4109,6 +4109,20 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  ins_arithpost
     |  ins_next
     break;
+
+  case BC_BNOT:
+    |  ins_AD
+    |  jmp ->vmeta_arith_unary
+  break;
+  case BC_IDIV:
+  case BC_BAND:
+  case BC_BOR:
+  case BC_BXOR:
+  case BC_SHL:
+  case BC_SHR:
+    |  ins_ABC
+    |  jmp ->vmeta_arith_vv
+  break;
 
   case BC_CAT:
     |  ins_ABC	// RA = dst, RB = src_start, RC = src_end

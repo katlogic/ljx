@@ -161,61 +161,19 @@ static int carith_int64(lua_State *L, CTState *cts, CDArith *ca, MMS mm)
       ctype_isnum(ca->ct[1]->info) && ca->ct[1]->size <= 8) {
     CTypeID id = (((ca->ct[0]->info & CTF_UNSIGNED) && ca->ct[0]->size == 8) ||
 		  ((ca->ct[1]->info & CTF_UNSIGNED) && ca->ct[1]->size == 8)) ?
-		 CTID_UINT64 : CTID_INT64;
+                  CTID_UINT64:CTID_INT64;
     CType *ct = ctype_get(cts, id);
-    GCcdata *cd;
-    uint64_t u0, u1, *up;
+    uint64_t u0, u1;
     lj_cconv_ct_ct(cts, ct, ca->ct[0], (uint8_t *)&u0, ca->p[0], 0);
-    if (mm != MM_unm)
+    if (mm != MM_unm && mm != MM_bnot)
       lj_cconv_ct_ct(cts, ct, ca->ct[1], (uint8_t *)&u1, ca->p[1], 0);
-    switch (mm) {
-    case MM_eq:
-      setboolV(L->top-1, (u0 == u1));
+    if (lj_carith_int64(L, L->top-1, id, u0, u1, mm)) {
+      lj_gc_check(L);
       return 1;
-    case MM_lt:
-      setboolV(L->top-1,
-	       id == CTID_INT64 ? ((int64_t)u0 < (int64_t)u1) : (u0 < u1));
-      return 1;
-    case MM_le:
-      setboolV(L->top-1,
-	       id == CTID_INT64 ? ((int64_t)u0 <= (int64_t)u1) : (u0 <= u1));
-      return 1;
-    default: break;
     }
-    cd = lj_cdata_new(cts, id, 8);
-    up = (uint64_t *)cdataptr(cd);
-    setcdataV(L, L->top-1, cd);
-    switch (mm) {
-    case MM_add: *up = u0 + u1; break;
-    case MM_sub: *up = u0 - u1; break;
-    case MM_mul: *up = u0 * u1; break;
-    case MM_div:
-      if (id == CTID_INT64)
-	*up = (uint64_t)lj_carith_divi64((int64_t)u0, (int64_t)u1);
-      else
-	*up = lj_carith_divu64(u0, u1);
-      break;
-    case MM_mod:
-      if (id == CTID_INT64)
-	*up = (uint64_t)lj_carith_modi64((int64_t)u0, (int64_t)u1);
-      else
-	*up = lj_carith_modu64(u0, u1);
-      break;
-    case MM_pow:
-      if (id == CTID_INT64)
-	*up = (uint64_t)lj_carith_powi64((int64_t)u0, (int64_t)u1);
-      else
-	*up = lj_carith_powu64(u0, u1);
-      break;
-    case MM_unm: *up = (uint64_t)-(int64_t)u0; break;
-    default: lua_assert(0); break;
-    }
-    lj_gc_check(L);
-    return 1;
   }
   return 0;
 }
-
 /* Handle ctype arithmetic metamethods. */
 static int lj_carith_meta(lua_State *L, CTState *cts, CDArith *ca, MMS mm)
 {
@@ -306,14 +264,75 @@ uint64_t lj_carith_shift64(uint64_t x, int32_t sh, int op)
   return x;
 }
 
-/* Equivalent to lj_lib_checkbit(), but handles cdata. */
-uint64_t lj_carith_check64(lua_State *L, int narg, CTypeID *id)
+
+int lj_carith_int64(lua_State *L, TValue *res, CTypeID id, uint64_t u0, uint64_t u1, MMS mm)
 {
-  TValue *o = L->base + narg-1;
-  if (o >= L->top) {
-  err:
-    lj_err_argt(L, narg, LUA_TNUMBER);
-  } else if (LJ_LIKELY(tvisnumber(o))) {
+  GCcdata *cd;
+  uint64_t *up;
+  switch (mm) {
+  case MM_eq:
+    setboolV(res, (u0 == u1));
+    return 1;
+  case MM_lt:
+    setboolV(res,
+             id == CTID_INT64 ? ((int64_t)u0 < (int64_t)u1) : (u0 < u1));
+    return 1;
+  case MM_le:
+    setboolV(res,
+             id == CTID_INT64 ? ((int64_t)u0 <= (int64_t)u1) : (u0 <= u1));
+    return 1;
+  default: break;
+  }
+  cd = lj_cdata_new_(L, id, 8);
+  up = (uint64_t *)cdataptr(cd);
+  setcdataV(L, res, cd);
+  switch (mm) {
+  case MM_add: *up = u0 + u1; break;
+  case MM_sub: *up = u0 - u1; break;
+  case MM_mul: *up = u0 * u1; break;
+  case MM_band: *up = u0 & u1; break;
+  case MM_bor: *up = u0 | u1; break;
+  case MM_bxor: *up = u0 ^ u1; break;
+  case MM_idiv:
+  case MM_div:
+    if (id == CTID_INT64)
+      *up = (uint64_t)lj_carith_divi64((int64_t)u0, (int64_t)u1);
+    else
+      *up = lj_carith_divu64(u0, u1);
+    break;
+  case MM_shl:
+    *up = lj_carith_shl64(u0, u1);
+    break;
+  case MM_shr:
+    if (id == CTID_INT64)
+     *up = lj_carith_sar64((int64_t)u0, (int64_t)u1);
+    else
+     *up = lj_carith_shr64(u0, u1);
+    break;
+  case MM_mod:
+    if (id == CTID_INT64)
+      *up = (uint64_t)lj_carith_modi64((int64_t)u0, (int64_t)u1);
+    else
+      *up = lj_carith_modu64(u0, u1);
+    break;
+  case MM_pow:
+    if (id == CTID_INT64)
+      *up = (uint64_t)lj_carith_powi64((int64_t)u0, (int64_t)u1);
+    else
+      *up = lj_carith_powu64(u0, u1);
+    break;
+  case MM_unm: *up = (uint64_t)-(int64_t)u0; break;
+  case MM_bnot: *up = (uint64_t)~(int64_t)u0; break;
+  default: lua_assert(0); break;
+  }
+  return 1;
+}
+
+
+/* Equivalent to lj_lib_checkbit(), but handles cdata. */
+uint64_t lj_carith_check64_raw(lua_State *L, cTValue *o, TValue *out, CTypeID *id)
+{
+  if (LJ_LIKELY(tvisnumber(o))) {
     /* Handled below. */
   } else if (tviscdata(o)) {
     CTState *cts = ctype_cts(L);
@@ -333,18 +352,29 @@ uint64_t lj_carith_check64(lua_State *L, int narg, CTypeID *id)
     else if (!*id)
       *id = CTID_INT64;  /* Use int64_t, unless already set. */
     lj_cconv_ct_ct(cts, ctype_get(cts, *id), s,
-		   (uint8_t *)&x, sp, CCF_ARG(narg));
+		   (uint8_t *)&x, sp, 0);
     return x;
-  } else if (!(tvisstr(o) && lj_strscan_number(strV(o), o))) {
-    goto err;
+  } else if (!(tvisstr(o) && lj_strscan_number(strV(o), out))) {
+    *id = -1;
+    return 0;
   }
-  if (LJ_LIKELY(tvisint(o))) {
-    return (uint32_t)intV(o);
+  if (LJ_LIKELY(tvisint(out))) {
+    return (uint32_t)intV(out);
   } else {
-    int32_t i = lj_num2bit(numV(o));
-    if (LJ_DUALNUM) setintV(o, i);
+    int32_t i = lj_num2bit(numV(out));
+    if (LJ_DUALNUM) setintV(out, i);
     return (uint32_t)i;
   }
+}
+
+uint64_t lj_carith_check64(lua_State *L, int narg, CTypeID *id)
+{
+  TValue *o = L->base + narg-1;
+  if (o >= L->top)
+    lj_err_argt(L, narg, LUA_TNUMBER);
+  lj_carith_check64_raw(L, o, o, id);
+  if (*id == -1)
+    lj_err_argt(L, narg, LUA_TNUMBER);
 }
 
 
