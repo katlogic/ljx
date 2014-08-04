@@ -43,6 +43,11 @@ LUALIB_API void luaL_openlibs(lua_State *L)
     luaL_requiref(L, lib->name, lib->func, 1);
     lua_pop(L, 1);  /* remove lib */
   }
+  for (lib = lj_lib_preload; lib->func; lib++) {
+    luaL_requiref(L, lib->name, lib->func, 0);
+    lua_pop(L, 1);
+  }
+#if 0
   luaL_findtable(L, LUA_REGISTRYINDEX, "_PRELOAD",
 		 sizeof(lj_lib_preload)/sizeof(lj_lib_preload[0])-1);
   for (lib = lj_lib_preload; lib->func; lib++) {
@@ -50,5 +55,6 @@ LUALIB_API void luaL_openlibs(lua_State *L)
     lua_setfield(L, -2, lib->name);
   }
   lua_pop(L, 1);
+#endif
 }
 

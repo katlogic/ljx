@@ -845,6 +845,7 @@ static GCtab *ffi_finalizer(lua_State *L)
 }
 
 /* Register FFI module as loaded. */
+#if 0
 static void ffi_register_module(lua_State *L)
 {
   cTValue *tmp = lj_tab_getstr(tabV(registry(L)), lj_str_newlit(L, "_LOADED"));
@@ -854,6 +855,7 @@ static void ffi_register_module(lua_State *L)
     lj_gc_anybarriert(L, t);
   }
 }
+#endif
 
 LUALIB_API int luaopen_ffi(lua_State *L)
 {
@@ -872,7 +874,9 @@ LUALIB_API int luaopen_ffi(lua_State *L)
   lua_pushliteral(L, LJ_OS_NAME);
   lua_pushliteral(L, LJ_ARCH_NAME);
   LJ_LIB_REG(L, NULL, ffi);  /* Note: no global "ffi" created! */
+#if 0
   ffi_register_module(L);
+#endif
   return 1;
 }
 
