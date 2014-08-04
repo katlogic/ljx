@@ -46,12 +46,14 @@ LJ_NORET LJ_NOINLINE static void clib_error_(lua_State *L)
 #define CLIB_SOPREFIX	"lib"
 #endif
 
+#define CLIB_FMT        "%s"
+
 #if LJ_TARGET_OSX
-#define CLIB_SOEXT	"%s.dylib"
+#define CLIB_SOEXT	".dylib"
 #elif defined(__CYGWIN__)
-#define CLIB_SOEXT	"%s.dll"
+#define CLIB_SOEXT	".dll"
 #else
-#define CLIB_SOEXT	"%s.so"
+#define CLIB_SOEXT	".so"
 #endif
 
 static const char *clib_extname(lua_State *L, const char *name)
@@ -61,8 +63,10 @@ static const char *clib_extname(lua_State *L, const char *name)
       && !strchr(name, '\\')
 #endif
      ) {
-    if (!strchr(name, '.')) {
-      name = lj_strfmt_pushf(L, CLIB_SOEXT, name);
+    int n = strlen(name);
+    if ((n < (sizeof(CLIB_SOEXT) - 1)) ||
+        (strcmp(name + n - sizeof(CLIB_SOEXT) + 1, CLIB_SOEXT))) {
+      name = lj_strfmt_pushf(L, CLIB_FMT CLIB_SOEXT, name);
       L->top--;
 #ifdef __CYGWIN__
     } else {
