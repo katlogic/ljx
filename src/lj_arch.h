@@ -6,8 +6,6 @@
 #ifndef _LJ_ARCH_H
 #define _LJ_ARCH_H
 
-#include "lua.h"
-
 /* Target endianess. */
 #define LUAJIT_LE	0
 #define LUAJIT_BE	1
@@ -450,6 +448,12 @@
 #define LJ_51			1
 #else
 #define LJ_51			0
+#endif
+
+#ifdef LUAJIT_ENABLE_LUA53COMPAT
+#define LJ_53			1
+#else
+#define	LJ_53			0
 #endif
 
 #endif
