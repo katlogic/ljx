@@ -82,6 +82,7 @@ FILE_SO= libluajit-ljx.so
 FILE_MAN= luajit.1
 FILE_PC= luajit.pc
 FILES_INC= lua.h lualib.h lauxlib.h luaconf.h lua.hpp luajit.h
+ARCH_INC= lj_arch.h
 FILES_JITLIB= bc.lua bcsave.lua dump.lua p.lua v.lua zone.lua \
 	      dis_x86.lua dis_x64.lua dis_arm.lua dis_ppc.lua \
 	      dis_mips.lua dis_mipsel.lua vmdef.lua
@@ -120,6 +121,7 @@ install: $(INSTALL_DEP)
 	  $(INSTALL_F) $(FILE_PC).tmp $(INSTALL_PC) && \
 	  $(RM) $(FILE_PC).tmp
 	cd src && $(INSTALL_F) $(FILES_INC) $(INSTALL_INC)
+	cd src && $(INSTALL_F) $(ARCH_INC).dist $(INSTALL_INC)/$(ARCH_INC)
 	cd src/jit && $(INSTALL_F) $(FILES_JITLIB) $(INSTALL_JITLIB)
 	@echo "==== Successfully installed LuaJIT/$(VERSION) to $(PREFIX) ===="
 	@echo ""

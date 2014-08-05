@@ -11,6 +11,7 @@
 #endif
 #include <limits.h>
 #include <stddef.h>
+#include "lj_arch.h"
 
 /* Default path for loading Lua and C modules with require(). */
 #if defined(_WIN32)

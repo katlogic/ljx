@@ -103,8 +103,13 @@ XCFLAGS=
 # Features from Lua 5.1 that are unlikely to break existing code are
 # enabled by default. Some other features that *might* break some existing
 # code (e.g. __pairs or os.execute() return values) can be enabled here.
-# Note: this does not provide full compatibility with Lua 5.1 at this time.
-#XCFLAGS+= -DLUAJIT_ENABLE_LUA51COMPAT
+# It will also report version as Lua 5.1.
+XCONFIG+= -DLUAJIT_ENABLE_LUA51COMPAT
+
+# Features from Lua 5.3.
+# Implies DUALNUM build.
+XCFLAGS+= -DLUAJIT_ENABLE_LUA53COMPAT
+
 #
 # This flag disables various kludges to emulate Lua Undefined/Underspecified
 # Behavior. Normally this is needed so buggy scripts continue to work,
@@ -496,7 +501,7 @@ LUAJIT_T= luajit-ljx
 
 ALL_T= $(LUAJIT_T) $(LUAJIT_A) $(LUAJIT_SO) $(HOST_T)
 ALL_HDRGEN= lj_bcdef.h lj_ffdef.h lj_libdef.h lj_recdef.h lj_folddef.h \
-	    host/buildvm_arch.h
+	    host/buildvm_arch.h lj_arch.h.dist
 ALL_GEN= $(LJVM_S) $(ALL_HDRGEN) $(LIB_VMDEFP)
 WIN_RM= *.obj *.lib *.exp *.dll *.exe *.manifest *.pdb *.ilk
 ALL_RM= $(ALL_T) $(ALL_GEN) *.o host/*.o $(WIN_RM)
@@ -587,7 +592,7 @@ endif
 # Make targets.
 ##############################################################################
 
-default all:	$(TARGET_T)
+default all:	$(TARGET_T) lj_arch.h.dist
 
 amalg:
 	@grep "^[+|]" ljamalg.c
@@ -661,6 +666,10 @@ $(LIB_VMDEF): $(BUILDVM_T) $(LJLIB_C)
 lj_folddef.h: $(BUILDVM_T) lj_opt_fold.c
 	$(E) "BUILDVM   $@"
 	$(Q)$(BUILDVM_X) -m folddef -o $@ lj_opt_fold.c
+
+lj_arch.h.dist: lj_arch.h
+	$(E) "ARCH      $@"
+	$(Q)$(CC) -dM -E lj_arch.h $(HOST_ACFLAGS) | egrep '#define (LUAJIT_|LJ_)' > lj_arch.h.dist
 
 ##############################################################################
 # Object file rules.
