@@ -18,14 +18,18 @@
 
 #define LUA_VERSION_LJX         1
 #define LUA_VERSION_MAJOR       "5"
+#if LJ_53
+#define LUA_VERSION_MINOR       "3"
+#define LUA_VERSION_NUM         503
+#else
 #define LUA_VERSION_MINOR       "2"
 #define LUA_VERSION_NUM         502
-#define LUA_VERSION_RELEASE     "3"
+#endif
+#define LUA_VERSION_RELEASE     "0"
 
 #define LUA_VERSION     "Lua " LUA_VERSION_MAJOR "." LUA_VERSION_MINOR
 #define LUA_RELEASE     LUA_VERSION "." LUA_VERSION_RELEASE
 
-#define LUA_VERSION_NUM	502
 #define LUA_COPYRIGHT	"Copyright (C) 1994-2013 Lua.org, PUC-Rio"
 #define LUA_AUTHORS	"R. Ierusalimschy, L. H. de Figueiredo & W. Celes"
 #define LUA_URL "http://lua.org/"
@@ -42,7 +46,7 @@
 /*
 ** XABI: pseudo-indices
 */
-#ifdef LUAJIT_ENABLE_LUA51COMPAT
+#if LJ_51
 #define LUAI_FIRSTPSEUDOIDX	(-10000)
 #define LUA_REGISTRYINDEX	(LUAI_FIRSTPSEUDOIDX)
 #define LUA_ENVIRONINDEX	(LUAI_FIRSTPSEUDOIDX-1)
@@ -72,7 +76,7 @@
 #define LUA_ERRSYNTAX	3
 #define LUA_ERRMEM	4
 /* XABI */
-#ifdef LUAJIT_ENABLE_LUA51COMPAT
+#if LJ_51
 #define LUA_ERRERR	5
 #else
 #define LUA_ERRGCMM	5
@@ -113,8 +117,6 @@ typedef void * (*lua_Alloc) (void *ud, void *ptr, size_t osize, size_t nsize);
 #define LUA_TFUNCTION		6
 #define LUA_TUSERDATA		7
 #define LUA_TTHREAD		8
-
-
 
 /* minimum Lua stack available to a C function */
 #define LUA_MINSTACK	20
@@ -194,6 +196,7 @@ LUA_API int             (lua_toboolean) (lua_State *L, int idx);
 LUA_API const char     *(lua_tolstring) (lua_State *L, int idx, size_t *len);
 LUA_API void         (lua_len) (lua_State *L, int i);
 LUA_API size_t          (lua_objlen) (lua_State *L, int idx);
+LUA_API size_t          (lua_rawlen) (lua_State *L, int idx);
 LUA_API lua_CFunction   (lua_tocfunction) (lua_State *L, int idx);
 LUA_API void	       *(lua_touserdata) (lua_State *L, int idx);
 LUA_API lua_State      *(lua_tothread) (lua_State *L, int idx);

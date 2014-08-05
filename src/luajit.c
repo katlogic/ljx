@@ -21,6 +21,26 @@
 
 #if LJ_TARGET_POSIX
 #include <unistd.h>
+
+#if !defined(lua_readline)
+#if defined(LUA_USE_READLINE)
+#include <readline/readline.h>
+#include <readline/history.h>
+#define lua_readline(L,b,p)     ((void)L, ((b)=readline(p)) != NULL)
+#define lua_saveline(L,idx) \
+          if (lua_rawlen(L,idx) > 0)  /* non-empty line? */ \
+          add_history(lua_tostring(L, idx));  /* add it to history */
+#define lua_freeline(L,b)       ((void)L, free(b))
+#else
+#define lua_readline(L,b,p) \
+          ((void)L, fputs(p, stdout), fflush(stdout),  /* show prompt */ \
+                   fgets(b, LUA_MAXINPUT, stdin) != NULL)  /* get line */
+#define lua_saveline(L,idx)     { (void)L; (void)idx; }
+#define lua_freeline(L,b)       { (void)L; (void)b; }
+#endif
+#endif
+
+
 #define lua_stdin_is_tty()	isatty(0)
 #elif LJ_TARGET_WINDOWS
 #include <io.h>
@@ -148,11 +168,26 @@ static void print_jit_status(lua_State *L)
 static void print_version(lua_State *L, int jit)
 {
 #ifndef LUAJIT_PRETEND_RIO
-  fputs(LJX_VERSION " -- " LJX_COPYRIGHT ". " LJX_URL "\n", stdout);
-  fputs(LUAJIT_VERSION " -- " LUAJIT_COPYRIGHT ". " LUAJIT_URL "\n", stdout);
-  if (jit) print_jit_status(L);
+  fputs(LJX_VERSION ", type _COPYRIGHTS, _CREDITS, _VERSION for more info.\n", stdout);
+  fputs("ABI: " LUA_VERSION_MAJOR "." LUA_VERSION_MINOR
+        " on " LJ_OS_NAME "/" LJ_ARCH_NAME, stdout);
+#ifdef __DATE__
+  fputs(", built " __DATE__, stdout);
 #endif
+#ifdef __VERSION__
+  fputs(" using GCC " __VERSION__ ")\n", stdout);
+#else
+  fputs("\n", stdout);
+#endif
+  if (jit) print_jit_status(L);
+#else
   fputs(LUA_RELEASE "  " LUA_COPYRIGHT"\n", stdout);
+#endif
+  /* These are defined only in interactive session. */
+  lua_pushliteral(L, LUA_COPYRIGHTS);
+  lua_setglobal(L, "_COPYRIGHTS");
+  lua_pushliteral(L, LUA_CREDITS);
+  lua_setglobal(L, "_CREDITS");
 }
 
 static int getargs(lua_State *L, char **argv, int n)
@@ -196,15 +231,13 @@ static int dolibrary(lua_State *L, const char *name)
   return report(L, status);
 }
 
-static void write_prompt(lua_State *L, int firstline)
+static const char *get_prompt(lua_State *L, int firstline)
 {
   const char *p;
   lua_getfield(L, LUA_GLOBALSINDEX, firstline ? "_PROMPT" : "_PROMPT2");
   p = lua_tostring(L, -1);
   if (p == NULL) p = firstline ? LUA_PROMPT : LUA_PROMPT2;
-  fputs(p, stdout);
-  fflush(stdout);
-  lua_pop(L, 1);  /* remove global */
+  return p;
 }
 
 static int incomplete(lua_State *L, int status)
@@ -223,10 +256,13 @@ static int incomplete(lua_State *L, int status)
 
 static int pushline(lua_State *L, int firstline)
 {
-  char buf[LUA_MAXINPUT];
-  write_prompt(L, firstline);
-  if (fgets(buf, LUA_MAXINPUT, stdin)) {
-    size_t len = strlen(buf);
+  char buffer[LUA_MAXINPUT];
+  char *buf = buffer;
+  size_t len;
+  const char *prmt = get_prompt(L, firstline);
+  if (lua_readline(L, buf, prmt)) {
+    lua_pop(L, 1); /* prompt */
+    len = strlen(buf);
     if (len > 0 && buf[len-1] == '\n')
       buf[len-1] = '\0';
     if (firstline && buf[0] == '=')
@@ -238,13 +274,27 @@ static int pushline(lua_State *L, int firstline)
   return 0;
 }
 
+static int addreturn (lua_State *L) {
+  int status;
+  size_t len; const char *line;
+  lua_pushliteral(L, "return ");
+  lua_pushvalue(L, -2);  /* duplicate line */
+  lua_concat(L, 2);  /* new line is "return ..." */
+  line = lua_tolstring(L, -1, &len);
+  if ((status = luaL_loadbuffer(L, line, len, "=stdin")) == LUA_OK)
+    lua_remove(L, -3);  /* remove original line */
+  else
+    lua_pop(L, 2);  /* remove result from 'luaL_loadbuffer' and new line */
+  return status;
+}
+
 static int loadline(lua_State *L)
 {
   int status;
   lua_settop(L, 0);
   if (!pushline(L, 1))
     return -1;  /* no input */
-  for (;;) {  /* repeat until gets a complete line */
+  if ((status = addreturn(L)) != LUA_OK) for (;;) {  /* repeat until gets a complete line */
     status = luaL_loadbuffer(L, lua_tostring(L, 1), lua_strlen(L, 1), "=stdin");
     if (!incomplete(L, status)) break;  /* cannot try to add lines? */
     if (!pushline(L, 0))  /* no more input? */
@@ -253,6 +303,7 @@ static int loadline(lua_State *L)
     lua_insert(L, -2);  /* ...between the two lines */
     lua_concat(L, 3);  /* join them */
   }
+  lua_saveline(L, 1);
   lua_remove(L, 1);  /* remove line */
   return status;
 }
@@ -539,7 +590,7 @@ static int pmain(lua_State *L)
     s->status = handle_luainit(L);
     if (s->status != 0) return 0;
   }
-  if ((flags & FLAGS_VERSION)) print_version(L, 0);
+  if ((flags & FLAGS_VERSION)) fputs(LUA_COPYRIGHTS "\n\nCredits:\n" LUA_CREDITS, stdout);
   s->status = runargs(L, argv, (script > 0) ? script : s->argc);
   if (s->status != 0) return 0;
   if (script) {

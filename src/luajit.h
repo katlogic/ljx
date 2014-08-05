@@ -37,8 +37,13 @@
 #define LUAJIT_URL		"http://luajit.org/"
 
 /* Let it be known who is responsible for this bastardization */
-#define LJX_COPYRIGHT	"Copyright (C) 2014 Karel Tuma"
+#define LJX_COPYRIGHT	"Copyright (C) 2014 Lua, LuaJIT and LJX authors"
 #define LJX_URL		"http://lua.cz/"
+
+#define LUA_COPYRIGHTS  \
+  LUA_VERSION " -- " LUA_COPYRIGHT " -- " LUA_URL "\n" \
+  LUAJIT_VERSION " -- " LUAJIT_COPYRIGHT " -- " LUAJIT_URL "\n" \
+  LJX_VERSION " -- " LUA_COPYRIGHT " -- " LJX_URL
 
 
 /* Modes for luaJIT_setmode. */
