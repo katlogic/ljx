@@ -222,7 +222,7 @@ TValue *lj_meta_arith(lua_State *L, TValue *ra, cTValue *rb, cTValue *rc,
     CTypeID idb, idc, id = CTID_INT64;
     TValue dummyb = *rb;
     TValue dummyc = *rc;
-    uint64_t vb, vc;
+    uint64_t vb, vc = 0;
     idb = idc = 0;
     vb = lj_carith_check64_raw(L, rb, &dummyb, &idb);
     if (idb != -1) {

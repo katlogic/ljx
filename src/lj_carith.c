@@ -370,11 +370,13 @@ uint64_t lj_carith_check64_raw(lua_State *L, cTValue *o, TValue *out, CTypeID *i
 uint64_t lj_carith_check64(lua_State *L, int narg, CTypeID *id)
 {
   TValue *o = L->base + narg-1;
+  uint64_t ret;
   if (o >= L->top)
     lj_err_argt(L, narg, LUA_TNUMBER);
-  lj_carith_check64_raw(L, o, o, id);
+  ret = lj_carith_check64_raw(L, o, o, id);
   if (*id == -1)
     lj_err_argt(L, narg, LUA_TNUMBER);
+  return ret;
 }
 
 
