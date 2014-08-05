@@ -107,7 +107,7 @@ XCFLAGS=
 XCONFIG+= -DLUAJIT_ENABLE_LUA51COMPAT
 
 # Features from Lua 5.3.
-# Implies DUALNUM build.
+# Forces FFI build (need ctypes to emulate integer math)
 XCFLAGS+= -DLUAJIT_ENABLE_LUA53COMPAT
 
 #
@@ -348,10 +348,10 @@ else
     endif
   endif
   ifeq (Linux,$(TARGET_SYS))
-    TARGET_XLIBS+= -ldl
+    TARGET_XLIBS+= -ldl -lreadline
   endif
   ifeq (GNU/kFreeBSD,$(TARGET_SYS))
-    TARGET_XLIBS+= -ldl
+    TARGET_XLIBS+= -ldl -lreadline
   endif
 endif
 endif
@@ -687,7 +687,7 @@ lj_arch.h.dist: lj_arch.h
 
 $(LUAJIT_O):
 	$(E) "CC        $@"
-	$(Q)$(TARGET_STCC) $(TARGET_ACFLAGS) -c -o $@ $<
+	$(Q)$(TARGET_STCC) $(TARGET_ACFLAGS) -DLUA_CREDITS="\"$(shell cat ../CREDITS | sed -e 's/$$/\\n/g' | tr -d '\n')\"" -c -o $@ $<
 
 $(HOST_O): %.o: %.c
 	$(E) "HOSTCC    $@"

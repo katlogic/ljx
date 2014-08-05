@@ -96,6 +96,7 @@
 #define LJ_TARGET_IOS		(LJ_TARGET_OSX && LUAJIT_TARGET == LUAJIT_ARCH_ARM)
 #define LJ_TARGET_POSIX		(LUAJIT_OS > LUAJIT_OS_WINDOWS)
 #define LJ_TARGET_DLOPEN	LJ_TARGET_POSIX
+#define LJ_TARGET_READLINE	(LJ_TARGET_LINUX || LJ_TARGET_OSX)
 
 #ifdef __CELLOS_LV2__
 #define LJ_TARGET_PS3		1
@@ -370,7 +371,8 @@
 #endif
 
 /* Disable or enable the FFI extension. */
-#if defined(LUAJIT_DISABLE_FFI) || defined(LJ_ARCH_NOFFI)
+#if ((defined(LUAJIT_DISABLE_FFI) || defined(LJ_ARCH_NOFFI)) \
+    && (!defined(LUAJIT_ENABLE_LUA53COMPAT)))
 #define LJ_HASFFI		0
 #else
 #define LJ_HASFFI		1
@@ -450,6 +452,7 @@
 #define LJ_51			0
 #endif
 
+/* Enable Lua 5.3 compatibility. */
 #ifdef LUAJIT_ENABLE_LUA53COMPAT
 #define LJ_53			1
 #else

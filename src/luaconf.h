@@ -170,4 +170,10 @@
 #define luai_apicheck(L, o)	{ (void)L; }
 #endif
 
+/* Define only if readline is available. */
+#if LJ_TARGET_READLINE
+#define LUA_USE_READLINE
 #endif
+
+#endif
+
