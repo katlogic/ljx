@@ -533,7 +533,7 @@ TRef lj_opt_narrow_arith(jit_State *J, TRef rb, TRef rc,
         return emitir(IRTGI((int)op - (int)IR_ADD + (int)IR_ADDOV), rb, rc);
 #else
     /* No overflow checking for integers in Lua 5.3 */
-    return emitir(IRTN(op), rb, rc);
+    return emitir(IRTI(op), rb, rc);
 #endif
   if (!tref_isnum(rb)) rb = emitir(IRTN(IR_CONV), rb, IRCONV_NUM_INT);
   if (!tref_isnum(rc)) rc = emitir(IRTN(IR_CONV), rc, IRCONV_NUM_INT);
@@ -545,17 +545,38 @@ TRef lj_opt_narrow_unm(jit_State *J, TRef rc, TValue *vc)
 {
   if (tref_isstr(rc)) {
     rc = emitir(IRTG(IR_STRTO, IRT_NUM), rc, 0);
-    lj_strscan_num(strV(vc), vc);
+    if (!lj_strscan_num(strV(vc), vc))
+      lj_trace_err(J, LJ_TRERR_BADTYPE);
   }
-#if !LJ_53
   if (tref_isinteger(rc)) {
+#if !LJ_53
     if ((uint32_t)numberVint(vc) != 0x80000000u)
       return emitir(IRTGI(IR_SUBOV), lj_ir_kint(J, 0), rc);
     rc = emitir(IRTN(IR_CONV), rc, IRCONV_NUM_INT);
-  }
+#else
+    return emitir(IRTI(IR_SUB), lj_ir_kint(J, 0), rc);
 #endif
+  }
   return emitir(IRTN(IR_NEG), rc, lj_ir_knum_neg(J));
 }
+
+/* Narrow bitwise negation. Returns int. */
+TRef lj_opt_narrow_bnot(jit_State *J, TRef tr, TValue *vc)
+{
+  tr = lj_ir_toint(J, tr, vc);
+  return emitir(IRTI(IR_SUB), lj_ir_kint(J, 0), tr);
+}
+
+/* Narrow other bitwise operators. */
+TRef lj_opt_narrow_bitwise(jit_State *J, TRef rb, TRef rc,
+			 TValue *vb, TValue *vc, IROp op)
+{
+  lua_assert(((op >= IR_BAND) && (op <= IR_BSAR)) || (op == IR_DIV));
+  rb = lj_ir_toint(J, rb, vb);
+  rc = lj_ir_toint(J, rc, vc);
+  return emitir(IRTI(op), rb, rc);
+}
+
 
 /* Narrowing of modulo operator. */
 TRef lj_opt_narrow_mod(jit_State *J, TRef rb, TRef rc, TValue *vc)

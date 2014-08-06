@@ -83,6 +83,7 @@ LJ_FUNC void lj_ir_kvalue(lua_State *L, TValue *tv, const IRIns *ir);
 /* Convert IR operand types. */
 LJ_FUNC TRef LJ_FASTCALL lj_ir_tonumber(jit_State *J, TRef tr);
 LJ_FUNC TRef LJ_FASTCALL lj_ir_tonum(jit_State *J, TRef tr);
+LJ_FUNC TRef LJ_FASTCALL lj_ir_toint(jit_State *J, TRef tr, TValue *vc);
 LJ_FUNC TRef LJ_FASTCALL lj_ir_tostr(jit_State *J, TRef tr);
 
 /* Miscellaneous IR ops. */
@@ -141,6 +142,9 @@ LJ_FUNC TRef LJ_FASTCALL lj_opt_narrow_cindex(jit_State *J, TRef key);
 #endif
 LJ_FUNC TRef lj_opt_narrow_arith(jit_State *J, TRef rb, TRef rc,
 				 TValue *vb, TValue *vc, IROp op);
+LJ_FUNC TRef lj_opt_narrow_bitwise(jit_State *J, TRef rb, TRef rc,
+			 TValue *vb, TValue *vc, IROp op);
+LJ_FUNC TRef lj_opt_narrow_bnot(jit_State *J, TRef tr, TValue *vc);
 LJ_FUNC TRef lj_opt_narrow_unm(jit_State *J, TRef rc, TValue *vc);
 LJ_FUNC TRef lj_opt_narrow_mod(jit_State *J, TRef rb, TRef rc, TValue *vc);
 LJ_FUNC TRef lj_opt_narrow_pow(jit_State *J, TRef rb, TRef rc, TValue *vc);

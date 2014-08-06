@@ -651,6 +651,7 @@ local function dumpon(opt, outfile)
   if active then dumpoff() end
 
   local colormode = os.getenv("COLORTERM") and "A" or "T"
+  print(1,colormode,os.getenv("COLORTERM") and "A" or "T")
   if opt then
     opt = gsub(opt, "[TAH]", function(mode) colormode = mode; return ""; end)
   end

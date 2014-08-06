@@ -2192,8 +2192,8 @@ static const struct {
 } priority[] = {
   {10, 10}, {10, 10},           /* '+' '-' */
   {11, 11}, {11, 11}, {11,11},  /* '*' '/' '%' */
-  {14, 13},                     /* '^' (right associative) */
-  {11, 11}, {11, 11},           /* '//' */
+  {14, 13}, {0,0}, {0,0},       /* '^' (right associative), -~ dummy */
+  {11, 11},                     /* '//' */
   {6, 6}, {4, 4}, {5, 5},       /* '&' '|' '~' */
   {7, 7}, {7, 7},               /* '<<' '>>' */
   {9, 8},                       /* '..' (right associative) */
@@ -2202,7 +2202,7 @@ static const struct {
   {2, 2}, {1, 1}                /* and, or */
 };
 
-#define UNARY_PRIORITY		8  /* Priority for unary operators. */
+#define UNARY_PRIORITY		12  /* Priority for unary operators. */
 
 /* Forward declaration. */
 static BinOpr expr_binop(LexState *ls, ExpDesc *v, uint32_t limit);

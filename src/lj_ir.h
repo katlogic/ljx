@@ -60,8 +60,8 @@
   _(BOR,	C , ref, ref) \
   _(BXOR,	C , ref, ref) \
   _(BSHL,	N , ref, ref) \
-  _(BSHR,	N , ref, ref) \
   _(BSAR,	N , ref, ref) \
+  _(BSHR,	N , ref, ref) \
   _(BROL,	N , ref, ref) \
   _(BROR,	N , ref, ref) \
   \

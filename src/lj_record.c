@@ -964,7 +964,7 @@ static TRef rec_mm_arith(jit_State *J, RecordIndex *ix, MMS mm)
   copyTV(J->L, basev+1, &ix->tabv);
   copyTV(J->L, basev+2, &ix->keyv);
   if (!lj_record_mm_lookup(J, ix, mm)) {  /* Lookup mm on 1st operand. */
-    if (mm != MM_unm) {
+    if (mm != MM_unm && mm != MM_bnot) {
       ix->tab = ix->key;
       copyTV(J->L, &ix->tabv, &ix->keyv);
       if (lj_record_mm_lookup(J, ix, mm))  /* Lookup mm on 2nd operand. */
@@ -1746,6 +1746,7 @@ void lj_record_ins(jit_State *J)
   RecordIndex ix;
   const BCIns *pc;
   BCIns ins;
+  IROp irop;
   BCOp op;
   TRef ra, rb, rc;
 
@@ -1968,8 +1969,27 @@ void lj_record_ins(jit_State *J)
       rc = rec_mm_len(J, rc, rcv);
     break;
 
+  /* -- Bitwise ops ------------------------------------------------------- */
+  case BC_BNOT: 
+    if (tref_isnumber_str(rc)) {
+      rc = lj_opt_narrow_bnot(J, rc, rcv);
+    } else {
+      ix.tab = rc;
+      copyTV(J->L, &ix.tabv, rcv);
+      rc = rec_mm_arith(J, &ix, MM_bnot);
+    }
+    break;
+  case BC_BAND: case BC_BOR: case BC_BXOR: case BC_SHL: case BC_SHR:
+    irop = op - BC_BAND + IR_BAND;
+  case BC_IDIV:
+    if (op == BC_IDIV)
+      irop = IR_DIV;
+    if (tref_isnumber_str(rb) && tref_isnumber_str(rc))
+      rc = lj_opt_narrow_bitwise(J, rb, rc, rbv, rcv, irop);
+    else
+      rc = rec_mm_arith(J, &ix, bcmode_mm(op));
+    break;
   /* -- Arithmetic ops ---------------------------------------------------- */
-
   case BC_UNM:
     if (tref_isnumber_str(rc)) {
       rc = lj_opt_narrow_unm(J, rc, rcv);

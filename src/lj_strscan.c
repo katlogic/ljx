@@ -481,7 +481,7 @@ int LJ_FASTCALL lj_strscan_num(GCstr *str, TValue *o)
 {
   StrScanFmt fmt = lj_strscan_scan((const uint8_t *)strdata(str), o,
 				   STRSCAN_OPT_TONUM);
-  lua_assert(fmt == STRSCAN_ERROR || fmt == STRSCAN_NUM);
+  lua_assert(fmt == STRSCAN_ERROR || (fmt == STRSCAN_NUM && tvisnum(o)));
   return (fmt != STRSCAN_ERROR);
 }
 

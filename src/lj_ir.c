@@ -439,6 +439,24 @@ TRef LJ_FASTCALL lj_ir_tonum(jit_State *J, TRef tr)
   return tr;
 }
 
+/* Convert from number or string to integer. */
+TRef LJ_FASTCALL lj_ir_toint(jit_State *J, TRef tr, TValue *vc)
+{
+  if (!tref_isinteger(tr)) {
+    if (tref_isstr(tr)) {
+      tr = emitir(IRTG(IR_STRTO, IRT_NUM), tr, 0);
+      if (!lj_strscan_num(strV(vc), vc))
+        lj_trace_err(J, LJ_TRERR_BADTYPE);
+    }
+    if (tref_isnum(tr))
+      tr = emitir(IRTGI(IR_CONV), tr, IRCONV_INT_NUM|IRCONV_CHECK);
+    else
+      lj_trace_err(J, LJ_TRERR_BADTYPE);
+  }
+  return tr;
+}
+
+
 /* Convert from integer or number to string. */
 TRef LJ_FASTCALL lj_ir_tostr(jit_State *J, TRef tr)
 {
