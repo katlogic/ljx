@@ -198,25 +198,17 @@ LJ_NORET static void err_limit(FuncState *fs, uint32_t limit, const char *what)
 static BCReg const_num(FuncState *fs, ExpDesc *e)
 {
   lua_State *L = fs->L;
-  TValue *o;
-  cTValue *k = &e->u.nval;
-  Node *n;
-  GCtab *t = fs->kt;
+  TValue tmp, *o;
   lua_assert(expr_isnumk(e));
-  /* lj_tab_set will merge 0.0 vs 0. We dont want that for constants. */
-  if (tvisint(k))
-    o = lj_tab_setint(L, t, intV(k));
-  else if (tvisnum(k)) {
-    n = hashnum(t, k);
-    do {
-      if (lj_obj_equal(&n->key, k)) {
-        o = &n->val;
-        goto done;
-      }
-    } while ((n = nextnode(n)));
-    o = lj_tab_newkey(L, t, k);
-  } else lua_assert(0);
-done:;
+#if LJ_DUALNUM && LJ_53
+  /* UGLY UGLY UGLY: Table code does not correctly preserve int keys yet :/ */
+  if (tvisint(&e->u.nval)) {
+    tmp = e->u.nval;
+    setitype(&tmp, LJ_TLIGHTUD);
+    o = lj_tab_set(L, fs->kt, &tmp);
+  } else
+#endif
+    o = lj_tab_set(L, fs->kt, &e->u.nval);
   if (tvhaskslot(o))
     return tvkslot(o);
   o->u64 = fs->nkn;
@@ -534,7 +526,7 @@ static void expr_toreg_nobranch(FuncState *fs, ExpDesc *e, BCReg reg)
 #else
     lua_Number n = expr_numberV(e);
     int32_t k = lj_num2int(n);
-    if (checki16(k) && (n == (lua_Number)k) != LJ_53)
+    if (checki16(k) && n == (lua_Number)k)
       ins = BCINS_AD(BC_KSHORT, reg, (BCReg)(uint16_t)k);
     else
 #endif
@@ -1432,10 +1424,14 @@ static void fs_fixup_k(FuncState *fs, GCproto *pt, void *kptr)
     Node *n = &node[i];
     if (tvhaskslot(&n->val)) {
       ptrdiff_t kidx = (ptrdiff_t)tvkslot(&n->val);
-      lua_assert(!tvisint(&n->key));
-      if (tvisnum(&n->key)) {
-	TValue *tv = &((TValue *)kptr)[kidx];
-	if (LJ_DUALNUM && !LJ_53) {
+      TValue *tv = &((TValue *)kptr)[kidx];
+      //lua_assert(!tvisint(&n->key));
+      if (itype(&n->key) == LJ_TLIGHTUD) {
+        TValue tmp = n->key;
+        setitype(&tmp, LJ_TISNUM);
+        *tv = tmp;
+      } else if (tvisnum(&n->key)) {
+	if (LJ_DUALNUM) {
 	  lua_Number nn = numV(&n->key);
 	  int32_t k = lj_num2int(nn);
 	  lua_assert(!tvismzero(&n->key));
@@ -2192,13 +2188,21 @@ static const struct {
 } priority[] = {
   {10, 10}, {10, 10},           /* '+' '-' */
   {11, 11}, {11, 11}, {11,11},  /* '*' '/' '%' */
-  {14, 13}, {0,0}, {0,0},       /* '^' (right associative), -~ dummy */
+  {14, 13},                     /* '^' */
+  
+  {0,0}, {0,0},                 /*  -~ dummy */
+
   {11, 11},                     /* '//' */
   {6, 6}, {4, 4}, {5, 5},       /* '&' '|' '~' */
   {7, 7}, {7, 7},               /* '<<' '>>' */
+
   {9, 8},                       /* '..' (right associative) */
+
   {3, 3}, {3, 3}, {3, 3},       /* ~=, ==, <, >= */
-  {3, 3}, {3, 3}, {3, 3},       /* <=, >, */
+  {3, 3},
+
+
+  {3, 3}, {3, 3},               /* <=, >, */
   {2, 2}, {1, 1}                /* and, or */
 };
 
