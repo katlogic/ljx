@@ -447,7 +447,7 @@ StrScanFmt lj_strscan_scan(const uint8_t *p, TValue *o, uint32_t opt)
     if (fmt == STRSCAN_INT && base == 10 &&
 	(dig < 10 || (dig == 10 && *sp <= '2' && x < 0x80000000u+neg))) {
       int32_t y = neg ? -(int32_t)x : (int32_t)x;
-      if ((opt & STRSCAN_OPT_TONUM)) {
+      if ((opt & STRSCAN_OPT_TONUM) || (LJ_53 && dp)) {
 	o->n = (double)y;
 	return STRSCAN_NUM;
       } else {
@@ -468,7 +468,10 @@ StrScanFmt lj_strscan_scan(const uint8_t *p, TValue *o, uint32_t opt)
     if (fmt == STRSCAN_NUM && (opt & STRSCAN_OPT_TOINT)) {
       double n = o->n;
       int32_t i = lj_num2int(n);
-      if (n == (lua_Number)i) { o->i = i; return STRSCAN_INT; }
+      if ((LJ_53 && (!dp)) || ((!LJ_53) && (n == (lua_Number)i))) {
+        o->i = i;
+        return STRSCAN_INT;
+      }
     }
     return fmt;
   }

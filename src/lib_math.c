@@ -213,6 +213,19 @@ LJLIB_CF(math_randomseed)
   return 0;
 }
 
+LJLIB_PUSH("integer")
+LJLIB_PUSH("number")
+LJLIB_CF(math_type)
+{
+  if (tvisint(L->base))
+    setstrV(L, L->base, strV(lj_lib_upvalue(L, 1)));
+  else if (tvisnum(L->base))
+    setstrV(L, L->base, strV(lj_lib_upvalue(L, 2)));
+  else
+    setnilV(L->base);
+  return 1;
+}
+
 /* ------------------------------------------------------------------------ */
 
 #include "lj_libdef.h"

@@ -96,7 +96,12 @@ char * LJ_FASTCALL lj_strfmt_wnum(char *p, cTValue *o)
 #if __BIONIC__
     if (tvismzero(o)) { *p++ = '-'; *p++ = '0'; return p; }
 #endif
-    return p + lua_number2str(p, o->n);
+    int len = lua_number2str(p, o->n);
+    if (p[strspn(p, "-0123456789")] == '\0') {
+      p[len++] = '.';
+      p[len++] = '0';
+    }
+    p += len;
   } else if (((o->u32.hi & 0x000fffff) | o->u32.lo) != 0) {
     *p++ = 'n'; *p++ = 'a'; *p++ = 'n';
   } else if ((o->u32.hi & 0x80000000) == 0) {

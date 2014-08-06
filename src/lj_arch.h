@@ -342,6 +342,12 @@
 #endif
 #endif
 
+/* Lua 5.3 always needs dual-number. */
+#ifdef LUAJIT_ENABLE_LUA53COMPAT
+#undef LUAJIT_NUMMODE
+#define LUAJIT_NUMMODE 2
+#endif
+
 /* Enable or disable the dual-number mode for the VM. */
 #if (LJ_ARCH_NUMMODE == LJ_NUMMODE_SINGLE && LUAJIT_NUMMODE == 2) || \
     (LJ_ARCH_NUMMODE == LJ_NUMMODE_DUAL && LUAJIT_NUMMODE == 1)
@@ -371,8 +377,7 @@
 #endif
 
 /* Disable or enable the FFI extension. */
-#if ((defined(LUAJIT_DISABLE_FFI) || defined(LJ_ARCH_NOFFI)) \
-    && (!defined(LUAJIT_ENABLE_LUA53COMPAT)))
+#if (defined(LUAJIT_DISABLE_FFI) || defined(LJ_ARCH_NOFFI))
 #define LJ_HASFFI		0
 #else
 #define LJ_HASFFI		1

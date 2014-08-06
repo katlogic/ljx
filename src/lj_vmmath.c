@@ -12,6 +12,8 @@
 #include "lj_obj.h"
 #include "lj_ir.h"
 #include "lj_vm.h"
+#include "lj_bc.h"
+#include "lj_parse.h"
 
 /* -- Helper functions for generated machine code ------------------------- */
 
@@ -44,6 +46,30 @@ double lj_vm_foldarith(double x, double y, int op)
   }
 }
 #endif
+
+/* TBD: Bit/integer operators are handled here for now, should be asm eventually. */
+int32_t lj_vm_foldint(int32_t x, int32_t y, int op)
+{
+  op += OPR_ADD;
+  switch (op) {
+    case OPR_ADD: return x+y;
+    case OPR_SUB: return x-y;
+    case OPR_MUL: return x*y;
+    case OPR_DIV: lua_assert(0); break; /* CAVEAT: Must be special cased. */
+    case OPR_MOD: return x%y;
+    case OPR_POW: lua_assert(0); break; /* CAVEAT: Must be special cased. */
+    case OPR_UNM: return -x;
+    case OPR_BNOT: return ~x;
+    case OPR_IDIV: return x/y;
+    case OPR_BAND: return x&y;
+    case OPR_BOR: return x|y;
+    case OPR_BXOR: return x^y;
+    case OPR_SHL: return x<<y;
+    case OPR_SHR: return x>>y;
+    default: lua_assert(0);
+  }
+  return 0; /* NOT REACHED */
+}
 
 #if LJ_HASJIT
 

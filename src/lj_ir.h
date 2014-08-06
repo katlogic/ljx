@@ -65,7 +65,7 @@
   _(BROL,	N , ref, ref) \
   _(BROR,	N , ref, ref) \
   \
-  /* Arithmetic ops. ORDER ARITH */ \
+  /* Arithmetic ops. ORDER ARITH. Linked to ORDER OPR and ORDER MM. */ \
   _(ADD,	C , ref, ref) \
   _(SUB,	N , ref, ref) \
   _(MUL,	C , ref, ref) \

@@ -58,7 +58,7 @@ CCOPT_ppcspe=
 CCOPT_mips=
 #
 ifneq (,$(DEBUG))
-CCDEBUG= -g -ggdb
+CCDEBUG= -g -ggdb -O0
 else
 CCDEBUG=
 endif
@@ -106,8 +106,7 @@ XCFLAGS=
 # It will also report version as Lua 5.1.
 XCONFIG+= -DLUAJIT_ENABLE_LUA51COMPAT
 
-# Features from Lua 5.3.
-# Forces FFI build (need ctypes to emulate integer math)
+# Lua 5.3 semantics - DUALNUM and disables overflow checks for integers.
 XCFLAGS+= -DLUAJIT_ENABLE_LUA53COMPAT
 
 #

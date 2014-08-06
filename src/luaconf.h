@@ -177,6 +177,11 @@
 
 #define LUA_MAXINTEGER INT_MAX
 #define LUA_MININTEGER INT_MIN
+#define lua_numtointeger(n,p) \
+    ((n) >= (LUA_NUMBER)(LUA_MININTEGER) && \
+     (n) < -(LUA_NUMBER)(LUA_MININTEGER) && \
+           (*(p) = (LUA_INTEGER)(n), 1))
+
 
 #endif
 

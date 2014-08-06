@@ -272,6 +272,11 @@ LUA_API int lua_isnumber(lua_State *L, int idx)
   return (tvisnumber(o) || (tvisstr(o) && lj_strscan_number(strV(o), &tmp)));
 }
 
+LUA_API int lua_isinteger(lua_State *L, int idx)
+{
+  return tvisint(index2adr(L, idx));
+}
+
 LUA_API int lua_isstring(lua_State *L, int idx)
 {
   cTValue *o = index2adr(L, idx);

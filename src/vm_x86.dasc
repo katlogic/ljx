@@ -337,6 +337,13 @@
 |.macro checkstr, reg, target; checktp reg, LJ_TSTR; jne target; .endmacro
 |.macro checktab, reg, target; checktp reg, LJ_TTAB; jne target; .endmacro
 |
+|.macro overflow, target
+#if !LJ_53
+|  jo target
+#endif
+|.endmacro
+|
+|
 |// These operands must be used with movzx.
 |.define PC_OP, byte [PC-4]
 |.define PC_RA, byte [PC-3]
@@ -3933,7 +3940,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  checkint RD, >5
     |  mov RB, [BASE+RD*8]
     |  neg RB
-    |  jo >4
+    |  overflow >4
     |  mov dword [BASE+RA*8+4], LJ_TISNUM
     |  mov dword [BASE+RA*8], RB
     |9:
@@ -4037,19 +4044,19 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |   checkint RB, ->vmeta_arith_vn
     |   cmp dword [KBASE+RC*8+4], LJ_TISNUM; jne ->vmeta_arith_vn
     |   mov RB, [BASE+RB*8]
-    |   intins RB, [KBASE+RC*8]; jo ->vmeta_arith_vno
+    |   intins RB, [KBASE+RC*8]; overflow ->vmeta_arith_vno
     ||  break;
     ||case 1:
     |   checkint RB, ->vmeta_arith_nv
     |   cmp dword [KBASE+RC*8+4], LJ_TISNUM; jne ->vmeta_arith_nv
     |   mov RC, [KBASE+RC*8]
-    |   intins RC, [BASE+RB*8]; jo ->vmeta_arith_nvo
+    |   intins RC, [BASE+RB*8]; overflow ->vmeta_arith_nvo
     ||  break;
     ||default:
     |   checkint RB, ->vmeta_arith_vv
     |   checkint RC, ->vmeta_arith_vv
     |   mov RB, [BASE+RB*8]
-    |   intins RB, [BASE+RC*8]; jo ->vmeta_arith_vvo
+    |   intins RB, [BASE+RC*8]; overflow ->vmeta_arith_vvo
     ||  break;
     ||}
     |  mov dword [BASE+RA*8+4], LJ_TISNUM
@@ -5337,7 +5344,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
 #endif
 	|  mov RB, dword FOR_STEP
 	|  test RB, RB; js >5
-	|  add RB, dword FOR_IDX; jo >1
+	|  add RB, dword FOR_IDX; overflow >1
 	|  mov dword FOR_IDX, RB
       }
       |  cmp RB, dword FOR_STOP
@@ -5369,7 +5376,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
       |
       |5:  // Invert check for negative step.
       if (vk) {
-	|  add RB, dword FOR_IDX; jo <1
+	|  add RB, dword FOR_IDX; overflow <1
 	|  mov dword FOR_IDX, RB
       }
       |  cmp RB, dword FOR_STOP

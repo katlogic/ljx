@@ -36,4 +36,23 @@ static LJ_AINLINE int lj_strscan_numberobj(TValue *o)
   return tvisnumber(o) || (tvisstr(o) && lj_strscan_number(strV(o), o));
 }
 
+static LJ_AINLINE int32_t lj_checkint(cTValue *o, int32_t *ret, int *hadfloat)
+{
+  TValue tmp;
+retry:;
+  if (tvisint(o)) {
+    *ret = intV(o);
+    return 1;
+  } else if (tvisnum(o)) {
+    if (hadfloat)
+      *hadfloat = 1;
+    if (lua_numtointeger(numV(o), ret) && ((lua_Number)*ret == numV(o)))
+      return 1;
+  } else if (tvisstr(o) && lj_strscan_num(strV(o), &tmp)) {
+    o = &tmp;
+    goto retry;
+  }
+  return 0;
+}
+
 #endif

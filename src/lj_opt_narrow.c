@@ -509,7 +509,7 @@ TRef LJ_FASTCALL lj_opt_narrow_cindex(jit_State *J, TRef tr)
 /* Check whether a number fits into an int32_t (-0 is ok, too). */
 static int numisint(lua_Number n)
 {
-  return (n == (lua_Number)lj_num2int(n));
+  return LJ_53 != (n == (lua_Number)lj_num2int(n));
 }
 
 /* Narrowing of arithmetic operations. */
@@ -526,10 +526,15 @@ TRef lj_opt_narrow_arith(jit_State *J, TRef rb, TRef rc,
   }
   /* Must not narrow MUL in non-DUALNUM variant, because it loses -0. */
   if ((op >= IR_ADD && op <= (LJ_DUALNUM ? IR_MUL : IR_SUB)) &&
-      tref_isinteger(rb) && tref_isinteger(rc) &&
-      numisint(lj_vm_foldarith(numberVnum(vb), numberVnum(vc),
+      tref_isinteger(rb) && tref_isinteger(rc))
+#if !LJ_53
+      if (numisint(lj_vm_foldarith(numberVnum(vb), numberVnum(vc),
 			       (int)op - (int)IR_ADD)))
-    return emitir(IRTGI((int)op - (int)IR_ADD + (int)IR_ADDOV), rb, rc);
+        return emitir(IRTGI((int)op - (int)IR_ADD + (int)IR_ADDOV), rb, rc);
+#else
+    /* No overflow checking for integers in Lua 5.3 */
+    return emitir(IRTN(op), rb, rc);
+#endif
   if (!tref_isnum(rb)) rb = emitir(IRTN(IR_CONV), rb, IRCONV_NUM_INT);
   if (!tref_isnum(rc)) rc = emitir(IRTN(IR_CONV), rc, IRCONV_NUM_INT);
   return emitir(IRTN(op), rb, rc);
@@ -542,11 +547,13 @@ TRef lj_opt_narrow_unm(jit_State *J, TRef rc, TValue *vc)
     rc = emitir(IRTG(IR_STRTO, IRT_NUM), rc, 0);
     lj_strscan_num(strV(vc), vc);
   }
+#if !LJ_53
   if (tref_isinteger(rc)) {
     if ((uint32_t)numberVint(vc) != 0x80000000u)
       return emitir(IRTGI(IR_SUBOV), lj_ir_kint(J, 0), rc);
     rc = emitir(IRTN(IR_CONV), rc, IRCONV_NUM_INT);
   }
+#endif
   return emitir(IRTN(IR_NEG), rc, lj_ir_knum_neg(J));
 }
 

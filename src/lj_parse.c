@@ -33,6 +33,7 @@
 #include "lj_vmevent.h"
 #include "lj_jit.h"
 #include "lj_dispatch.h"
+#include "lj_strscan.h"
 
 /* -- Parser structures and definitions ----------------------------------- */
 
@@ -84,6 +85,7 @@ typedef struct ExpDesc {
 
 #define expr_numtv(e)		check_exp(expr_isnumk((e)), &(e)->u.nval)
 #define expr_numberV(e)		numberVnum(expr_numtv((e)))
+#define expr_intV(e)		intV(expr_numtv((e)))
 
 /* Initialize expression. */
 static LJ_AINLINE void expr_init(ExpDesc *e, ExpKind k, uint32_t info)
@@ -152,17 +154,6 @@ typedef struct FuncState {
   uint8_t uvcount[LJ_MAX_UPVAL]; /* Usage count of each upvalue link. */
 } FuncState;
 
-/* Binary and unary operators. ORDER OPR */
-typedef enum BinOpr {
-  OPR_ADD, OPR_SUB, OPR_MUL, OPR_DIV, OPR_MOD, OPR_POW,  /* ORDER ARITH */
-  OPR_IDIV, OPR_BAND, OPR_BOR, OPR_BXOR, OPR_SHL, OPR_SHR, /* ORDER IOPR */
-  OPR_CONCAT,
-  OPR_NE, OPR_EQ, OPR_LT, OPR_GE,
-  OPR_LE, OPR_GT,
-  OPR_AND, OPR_OR,
-  OPR_NOBINOPR
-} BinOpr;
-
 LJ_STATIC_ASSERT((int)BC_ISGE-(int)BC_ISLT == (int)OPR_GE-(int)OPR_LT);
 LJ_STATIC_ASSERT((int)BC_ISLE-(int)BC_ISLT == (int)OPR_LE-(int)OPR_LT);
 LJ_STATIC_ASSERT((int)BC_ISGT-(int)BC_ISLT == (int)OPR_GT-(int)OPR_LT);
@@ -208,8 +199,24 @@ static BCReg const_num(FuncState *fs, ExpDesc *e)
 {
   lua_State *L = fs->L;
   TValue *o;
+  cTValue *k = &e->u.nval;
+  Node *n;
+  GCtab *t = fs->kt;
   lua_assert(expr_isnumk(e));
-  o = lj_tab_set(L, fs->kt, &e->u.nval);
+  /* lj_tab_set will merge 0.0 vs 0. We dont want that for constants. */
+  if (tvisint(k))
+    o = lj_tab_setint(L, t, intV(k));
+  else if (tvisnum(k)) {
+    n = hashnum(t, k);
+    do {
+      if (lj_obj_equal(&n->key, k)) {
+        o = &n->val;
+        goto done;
+      }
+    } while ((n = nextnode(n)));
+    o = lj_tab_newkey(L, t, k);
+  } else lua_assert(0);
+done:;
   if (tvhaskslot(o))
     return tvkslot(o);
   o->u64 = fs->nkn;
@@ -527,7 +534,7 @@ static void expr_toreg_nobranch(FuncState *fs, ExpDesc *e, BCReg reg)
 #else
     lua_Number n = expr_numberV(e);
     int32_t k = lj_num2int(n);
-    if (checki16(k) && n == (lua_Number)k)
+    if (checki16(k) && (n == (lua_Number)k) != LJ_53)
       ins = BCINS_AD(BC_KSHORT, reg, (BCReg)(uint16_t)k);
     else
 #endif
@@ -778,12 +785,20 @@ static int foldarith(BinOpr opr, ExpDesc *e1, ExpDesc *e2)
 {
   TValue o;
   lua_Number n;
-  if (opr >= OPR_IDIV) return 0;
+  int32_t i1, i2;
+  int hadfloat = 0;
   if (!expr_isnumk_nojump(e1) || !expr_isnumk_nojump(e2)) return 0;
+  if (opr != OPR_DIV && opr != OPR_POW &&
+      lj_checkint(expr_numtv(e1), &i1, &hadfloat) && lj_checkint(expr_numtv(e2), &i2, &hadfloat)) {
+    if (!hadfloat || opr >= OPR_BNOT) {
+      setintV(&e1->u.nval, lj_vm_foldint(i1, i2, (int)opr-OPR_ADD));
+      return 1;
+    }
+  }
   n = lj_vm_foldarith(expr_numberV(e1), expr_numberV(e2), (int)opr-OPR_ADD);
   setnumV(&o, n);
   if (tvisnan(&o) || tvismzero(&o)) return 0;  /* Avoid NaN and -0 as consts. */
-  if (LJ_DUALNUM) {
+  if (LJ_DUALNUM && !LJ_53) {
     int32_t k = lj_num2int(n);
     if ((lua_Number)k == n) {
       setintV(&e1->u.nval, k);
@@ -959,7 +974,8 @@ static void bcemit_unop(FuncState *fs, BCOp op, ExpDesc *e)
     } else {
       lua_assert(e->k == VNONRELOC);
     }
-  } else {
+  } else if (!expr_hasjump(e)) {
+    int32_t i;
     lua_assert(op == BC_UNM || op == BC_LEN || op == BC_BNOT);
     if (op == BC_UNM && !expr_hasjump(e)) {  /* Constant-fold negations. */
 #if LJ_HASFFI
@@ -973,11 +989,11 @@ static void bcemit_unop(FuncState *fs, BCOp op, ExpDesc *e)
 	return;
       } else
 #endif
-      if (expr_isnumk(e) && !expr_numiszero(e)) {  /* Avoid folding to -0. */
+      if (expr_isnumk(e) && (!expr_numiszero(e) || LJ_53)) {  /* Avoid folding to -0. */
 	TValue *o = expr_numtv(e);
 	if (tvisint(o)) {
 	  int32_t k = intV(o);
-	  if (k == -k)
+	  if (k == -k && !LJ_53)
 	    setnumV(o, -(lua_Number)k);
 	  else
 	    setintV(o, -k);
@@ -987,9 +1003,13 @@ static void bcemit_unop(FuncState *fs, BCOp op, ExpDesc *e)
 	  return;
 	}
       }
+    } else if (op == BC_BNOT && lj_checkint(expr_numtv(e), &i, NULL)) {  /* Constant-fold ~. */
+      TValue *o = expr_numtv(e);
+      setintV(o, lj_vm_foldint(i, 0, OPR_BNOT-OPR_ADD));
     }
     expr_toanyreg(fs, e);
-  }
+  } else
+    expr_toanyreg(fs, e);
   expr_free(fs, e);
   e->u.s.info = bcemit_AD(fs, op, 0, e->u.s.info);
   e->k = VRELOCABLE;
@@ -1401,7 +1421,7 @@ static void fs_fixup_k(FuncState *fs, GCproto *pt, void *kptr)
   for (i = 0; i < kt->asize; i++)
     if (tvhaskslot(&array[i])) {
       TValue *tv = &((TValue *)kptr)[tvkslot(&array[i])];
-      if (LJ_DUALNUM)
+      if (tvisint(tv))
 	setintV(tv, (int32_t)i);
       else
 	setnumV(tv, (lua_Number)i);
@@ -1415,7 +1435,7 @@ static void fs_fixup_k(FuncState *fs, GCproto *pt, void *kptr)
       lua_assert(!tvisint(&n->key));
       if (tvisnum(&n->key)) {
 	TValue *tv = &((TValue *)kptr)[kidx];
-	if (LJ_DUALNUM) {
+	if (LJ_DUALNUM && !LJ_53) {
 	  lua_Number nn = numV(&n->key);
 	  int32_t k = lj_num2int(nn);
 	  lua_assert(!tvismzero(&n->key));
