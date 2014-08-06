@@ -96,6 +96,8 @@ LJLIB_ASM_(math_max)		LJLIB_REC(math_minmax IR_MAX)
 
 LJLIB_PUSH(3.14159265358979323846) LJLIB_SET(pi)
 LJLIB_PUSH(1e310) LJLIB_SET(huge)
+LJLIB_PUSH(2147483647) LJLIB_SET(maxinteger);
+LJLIB_PUSH(-2147483648) LJLIB_SET(mininteger);
 
 /* ------------------------------------------------------------------------ */
 

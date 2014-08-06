@@ -175,5 +175,8 @@
 #define LUA_USE_READLINE
 #endif
 
+#define LUA_MAXINTEGER INT_MAX
+#define LUA_MININTEGER INT_MIN
+
 #endif
 
