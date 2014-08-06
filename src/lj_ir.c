@@ -448,8 +448,9 @@ TRef LJ_FASTCALL lj_ir_toint(jit_State *J, TRef tr, TValue *vc)
       if (!lj_strscan_num(strV(vc), vc))
         lj_trace_err(J, LJ_TRERR_BADTYPE);
     }
+    /* TBD: trunc check and bail out when we have fractional part. */
     if (tref_isnum(tr))
-      tr = emitir(IRTGI(IR_CONV), tr, IRCONV_INT_NUM|IRCONV_CHECK);
+      tr = emitir(IRTGI(IR_CONV), tr, IRCONV_INT_NUM|IRCONV_INDEX);
     else
       lj_trace_err(J, LJ_TRERR_BADTYPE);
   }

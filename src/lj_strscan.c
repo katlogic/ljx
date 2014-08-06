@@ -467,7 +467,7 @@ StrScanFmt lj_strscan_scan(const uint8_t *p, TValue *o, uint32_t opt)
     /* Try to convert number to integer, if requested. */
     if (fmt == STRSCAN_NUM && (opt & STRSCAN_OPT_TOINT)) {
       double n = o->n;
-      int32_t i = lj_num2int(n);
+      int32_t i = lj_num2int((int64_t)n);
       if ((LJ_53 && (!dp)) || ((!LJ_53) && (n == (lua_Number)i))) {
         o->i = i;
         return STRSCAN_INT;

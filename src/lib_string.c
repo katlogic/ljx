@@ -764,6 +764,227 @@ again:
   return 1;
 }
 
+/* TBD: rewrite this; probably using FFI? */
+
+/* translate a relative string position: negative means back from end */
+static lua_Integer posrelat (lua_Integer pos, size_t len) {
+  if (pos >= 0) return pos;
+  else if (0u - (size_t)pos > len) return 0;
+  else return (lua_Integer)len + pos + 1;
+}
+
+
+/* number of bits in a character */
+#define NB	CHAR_BIT
+
+/* mask for one character (NB 1's) */
+#define MC	((1 << NB) - 1)
+
+/* mask for one character without sign bit ((NB - 1) 1's) */
+#define SM	(MC >> 1)
+
+/* size of a lua_Integer */
+#define SZINT	((int)sizeof(lua_Integer))
+
+/* maximum size for the binary representation of an integer */
+#define MAXINTSIZE	12
+
+
+static union {
+  int dummy;
+  char little;  /* true iff machine is little endian */
+} const nativeendian = {1};
+
+
+static int getendian (lua_State *L, int arg) {
+  const char *endian = luaL_optstring(L, arg,
+                             (nativeendian.little ? "l" : "b"));
+  if (*endian == 'n')  /* native? */
+    return nativeendian.little;
+  luaL_argcheck(L, *endian == 'l' || *endian == 'b', arg,
+                   "endianness must be 'l'/'b'/'n'");
+  return (*endian == 'l');
+}
+
+
+static int getintsize (lua_State *L, int arg) {
+  int size = luaL_optint(L, arg, 0);
+  if (size == 0) size = SZINT;
+  luaL_argcheck(L, 1 <= size && size <= MAXINTSIZE, arg,
+                   "integer size out of valid range");
+  return size;
+}
+
+
+/* mask for all ones in last byte in a lua Integer */
+#define HIGHERBYTE    ((lua_Unsigned)MC << (NB * (SZINT - 1)))
+
+
+static int dumpint (char *buff, lua_Integer m, int littleendian, int size) {
+  int i;
+  lua_Unsigned n = (lua_Unsigned)m;
+  lua_Unsigned mask = (m >= 0) ? 0 : HIGHERBYTE;  /*  sign extension */
+  if (littleendian) {
+    for (i = 0; i < size - 1; i++) {
+      buff[i] = (n & MC);
+      n = (n >> NB) | mask;
+    }
+  }
+  else {
+    for (i = size - 1; i > 0; i--) {
+      buff[i] = (n & MC);
+      n = (n >> NB) | mask;
+    }
+  }
+  buff[i] = (n & MC);  /* last byte */
+  if (size < SZINT) {  /* need test for overflow? */
+    /* OK if there are only zeros left in higher bytes,
+       or only ones left (excluding non-signal bits in last byte) */
+    return ((n & ~(lua_Unsigned)MC) == 0 ||
+            (n | SM) == ~(lua_Unsigned)0);
+  }
+  else return 1;  /* no overflow can occur with full size */
+}
+
+
+/* mask to check higher-order byte + signal bit of next (lower) byte */
+#define HIGHERBYTE1   (HIGHERBYTE | (HIGHERBYTE >> 1))
+
+
+static int undumpint (const char *buff, lua_Integer *res,
+                      int littleendian, int size) {
+  lua_Unsigned n = 0;
+  int i;
+  for (i = 0; i < size; i++) {
+    if (i >= SZINT) {  /* will throw away a byte? */
+      /* check for overflow: it is OK to throw away leading zeros for a
+         positive number, leading ones for a negative number, and a
+         leading zero byte to allow unsigned integers with a 1 in
+         its "signal bit" */
+      if (!((n & HIGHERBYTE1) == 0 ||  /* zeros for positive number */
+          (n & HIGHERBYTE1) == HIGHERBYTE1 ||  /* ones for negative number */
+          (i == size - 1 && (n & HIGHERBYTE) == 0)))  /* leading zero */
+        return 0;  /* overflow */
+    }
+    n <<= NB;
+    n |= (lua_Unsigned)(unsigned char)buff[littleendian ? size - 1 - i : i];
+  }
+  if (size < SZINT) {  /* need sign extension? */
+    lua_Unsigned mask = (lua_Unsigned)1 << (size*NB - 1);
+    *res = (lua_Integer)((n ^ mask) - mask);  /* do sign extension */
+  }
+  else
+    *res = (lua_Integer)n;
+  return 1;
+}
+
+
+
+static void correctendianness (lua_State *L, char *b, int size, int endianarg) {
+  int endian = getendian(L, endianarg);
+  if (endian != nativeendian.little) {  /* not native endianness? */
+    int i = 0;
+    while (i < --size) {
+      char temp = b[i];
+      b[i++] = b[size];
+      b[size] = temp;
+    }
+  }
+}
+
+
+static int getfloatsize (lua_State *L, int arg) {
+  const char *size = luaL_optstring(L, arg, "n");
+  if (*size == 'n') return sizeof(lua_Number);
+  luaL_argcheck(L, *size == 'd' || *size == 'f', arg,
+                   "size must be 'f'/'d'/'n'");
+  return (*size == 'd' ? sizeof(double) : sizeof(float));
+}
+
+LJLIB_CF(string_dumpint) {
+  char buff[MAXINTSIZE];
+  lua_Integer n = luaL_checkinteger(L, 1);
+  int size = getintsize(L, 2);
+  int endian = getendian(L, 3);
+  if (dumpint(buff, n, endian, size))
+    lua_pushlstring(L, buff, size);
+  else
+    luaL_error(L, "integer does not fit into given size (%d)", size);
+  return 1;
+}
+
+LJLIB_CF(string_undumpint)
+{
+  lua_Integer res;
+  size_t len;
+  const char *s = luaL_checklstring(L, 1, &len);
+  lua_Integer pos = posrelat(luaL_optinteger(L, 2, 1), len);
+  int size = getintsize(L, 3);
+  int endian = getendian(L, 4);
+  luaL_argcheck(L, 1 <= pos && (size_t)pos + size - 1 <= len, 1,
+                   "string too short");
+  if(undumpint(s + pos - 1, &res, endian, size))
+    lua_pushinteger(L, res);
+  else
+    luaL_error(L, "result does not fit into a Lua integer");
+  return 1;
+}
+
+
+LJLIB_CF(string_dumpfloat)
+{
+  float f;  double d;
+  char *pn;  /* pointer to number */
+  lua_Number n = luaL_checknumber(L, 1);
+  int size = getfloatsize(L, 2);
+  if (size == sizeof(lua_Number))
+    pn = (char*)&n;
+  else if (size == sizeof(float)) {
+    f = (float)n;
+    pn = (char*)&f;
+  }  
+  else {  /* native lua_Number may be neither float nor double */
+    lua_assert(size == sizeof(double));
+    d = (double)n;
+    pn = (char*)&d;
+  }
+  correctendianness(L, pn, size, 3);
+  lua_pushlstring(L, pn, size);
+  return 1;
+}
+
+
+LJLIB_CF(string_undumpfloat)
+{
+  lua_Number res;
+  size_t len;
+  const char *s = luaL_checklstring(L, 1, &len);
+  lua_Integer pos = posrelat(luaL_optinteger(L, 2, 1), len);
+  int size = getfloatsize(L, 3);
+  luaL_argcheck(L, 1 <= pos && (size_t)pos + size - 1 <= len, 1,
+                   "string too short");
+  if (size == sizeof(lua_Number)) {
+    memcpy(&res, s + pos - 1, size); 
+    correctendianness(L, (char*)&res, size, 4);
+  }
+  else if (size == sizeof(float)) {
+    float f;
+    memcpy(&f, s + pos - 1, size); 
+    correctendianness(L, (char*)&f, size, 4);
+    res = (lua_Number)f;
+  }  
+  else {  /* native lua_Number may be neither float nor double */
+    double d;
+    lua_assert(size == sizeof(double));
+    memcpy(&d, s + pos - 1, size); 
+    correctendianness(L, (char*)&d, size, 4);
+    res = (lua_Number)d;
+  }
+  lua_pushnumber(L, res);
+  return 1;
+}
+
+
 /* ------------------------------------------------------------------------ */
 
 #include "lj_libdef.h"

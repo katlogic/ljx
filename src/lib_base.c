@@ -257,7 +257,7 @@ LJLIB_ASM(tonumber)		LJLIB_REC(.)
 
   if (base == 0) {
     TValue *o = lj_lib_checkany(L, 1);
-#if !LJ_51
+#if !LJ_51 && 0
     base = 10;
     /* TBD: This is intentionally super ugly - implement sane strict number switching. */
     int i; if (tvisstr(o)) for (i = 0; i < strV(o)->len; i++) if (!strdata(strV(o))[i]) goto strictnum;
@@ -297,7 +297,7 @@ strictnum:;
     if (p != ep) {
       while (lj_char_isspace((unsigned char)(*ep))) ep++;
       if (ep == (p+str->len)) {
-	if (LJ_DUALNUM && LJ_LIKELY(ul < 0x80000000u))
+	if (LJ_DUALNUM && !LJ_53 && LJ_LIKELY(ul < 0x80000000u))
 	  setintV(L->base-1, (int32_t)ul);
 	else
 	  setnumV(L->base-1, (lua_Number)((long)ul));

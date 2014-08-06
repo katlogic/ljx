@@ -564,7 +564,7 @@ TRef lj_opt_narrow_unm(jit_State *J, TRef rc, TValue *vc)
 TRef lj_opt_narrow_bnot(jit_State *J, TRef tr, TValue *vc)
 {
   tr = lj_ir_toint(J, tr, vc);
-  return emitir(IRTI(IR_SUB), lj_ir_kint(J, 0), tr);
+  return emitir(IRTI(IR_BNOT), tr, 0);
 }
 
 /* Narrow other bitwise operators. */

@@ -787,6 +787,8 @@ static int foldarith(BinOpr opr, ExpDesc *e1, ExpDesc *e2)
       return 1;
     }
   }
+  if (opr >= OPR_BNOT)
+    return 0;
   n = lj_vm_foldarith(expr_numberV(e1), expr_numberV(e2), (int)opr-OPR_ADD);
   setnumV(&o, n);
   if (tvisnan(&o) || tvismzero(&o)) return 0;  /* Avoid NaN and -0 as consts. */

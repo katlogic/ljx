@@ -225,7 +225,7 @@ TValue *lj_meta_arith(lua_State *L, TValue *ra, cTValue *rb, cTValue *rc,
       }
     }
   }
-  if ((b = str2num(rb, &tempb)) != NULL &&
+  if (mm < MM_bnot && (b = str2num(rb, &tempb)) != NULL &&
         (c = str2num(rc, &tempc)) != NULL) {  /* Try coercion first. */
     setnumV(ra, lj_vm_foldarith(numV(b), numV(c), (int)mm-MM_add));
     return NULL;

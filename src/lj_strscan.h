@@ -6,6 +6,7 @@
 #ifndef _LJ_STRSCAN_H
 #define _LJ_STRSCAN_H
 
+#include <math.h>
 #include "lj_obj.h"
 
 /* Options for accepted/returned formats. */
@@ -36,6 +37,16 @@ static LJ_AINLINE int lj_strscan_numberobj(TValue *o)
   return tvisnumber(o) || (tvisstr(o) && lj_strscan_number(strV(o), o));
 }
 
+    /* TBD: do this better somehow. */
+static LJ_AINLINE int lj_canbeint(double v, int32_t *ret)
+{
+  if (trunc(v) == v) {
+    *ret = (int64_t)v;
+    return 1;
+  }
+  return 0;
+}
+
 static LJ_AINLINE int32_t lj_checkint(cTValue *o, int32_t *ret, int *hadfloat)
 {
   TValue tmp;
@@ -46,7 +57,7 @@ retry:;
   } else if (tvisnum(o)) {
     if (hadfloat)
       *hadfloat = 1;
-    if (lua_numtointeger(numV(o), ret) && ((lua_Number)*ret == numV(o)))
+    if (lj_canbeint(numV(o), ret))
       return 1;
   } else if (tvisstr(o) && lj_strscan_num(strV(o), &tmp)) {
     o = &tmp;
