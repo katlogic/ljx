@@ -213,7 +213,7 @@ TValue *lj_meta_arith(lua_State *L, TValue *ra, cTValue *rb, cTValue *rc,
 {
   TValue tempb, tempc;
   cTValue *b, *c;
-  int32_t ib, ic;
+  int32_t ib, ic = 0;
   int hadfloat = 0;
   MMS mm = bcmode_mm(op);
   if (mm != MM_div && mm != MM_pow) {
