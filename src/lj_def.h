@@ -46,7 +46,7 @@ typedef unsigned int uintptr_t;
 #include <stdlib.h>
 
 /* Various VM limits. */
-#define LJ_MAX_MEM	0x7fff0000	/* Max. total memory allocation. CAVEAT: Must fit step adjusts. */
+#define LJ_MAX_MEM	0xffff0000	/* Max. total memory allocation. CAVEAT: Must fit step adjusts. */
 #define LJ_MAX_ALLOC	LJ_MAX_MEM	/* Max. individual allocation length. */
 #define LJ_MAX_STR	LJ_MAX_MEM	/* Max. string length. */
 #define LJ_MAX_UDATA	LJ_MAX_MEM	/* Max. userdata length. */

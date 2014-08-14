@@ -106,9 +106,9 @@ XCFLAGS=
 # It will also report version as Lua 5.1.
 XCONFIG+= -DLUAJIT_ENABLE_LUA51COMPAT
 
-# Features from Lua 5.3.
-# Forces FFI build (need ctypes to emulate integer math)
-XCFLAGS+= -DLUAJIT_ENABLE_LUA53COMPAT
+# Features from Lua 5.3, notably integer support.
+# (work in progress)
+# XCFLAGS+= -DLUAJIT_ENABLE_LUA53COMPAT
 
 #
 # This flag disables various kludges to emulate Lua Undefined/Underspecified
