@@ -36,7 +36,7 @@
 #define GCSWEEPCOST	10
 #define GCSWEEPSTRCOST	10
 #define GCFINALIZECOST	GCSWEEPCOST
-#define STEPMULADJ      200
+#define STEPMULADJ      200LL
 #define PAUSEADJ        100
 
 /*
@@ -104,10 +104,10 @@ LJ_FUNC void lj_gc_fullgc(lua_State *L);
 
 /* GC check: drive collector forward if the GC threshold has been reached. */
 #define lj_gc_check(L) \
-  { if (LJ_UNLIKELY(G(L)->gc.debt > 0)) \
+  { if (LJ_UNLIKELY(G(L)->gc.debt32 > 0)) \
       lj_gc_step(L); }
 #define lj_gc_check_fixtop(L) \
-  { if (LJ_UNLIKELY(G(L)->gc.debt > 0)) \
+  { if (LJ_UNLIKELY(G(L)->gc.debt32 > 0)) \
       lj_gc_step_fixtop(L); }
 
 /* Write barriers. */
@@ -159,7 +159,8 @@ LJ_FUNC void *lj_mem_grow(lua_State *L, void *p,
 
 static LJ_AINLINE void lj_mem_free(global_State *g, void *p, size_t osize)
 {
-  g->gc.debt -= (MSize)osize;
+  g->gc.debt -= osize;
+  g->gc.debt32 = g->gc.debt > 0;
   g->allocf(g->allocd, p, osize, 0);
 }
 

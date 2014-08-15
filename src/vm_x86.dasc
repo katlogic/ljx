@@ -1383,7 +1383,7 @@ static void build_subroutines(BuildCtx *ctx)
   |
   |// Inlined GC threshold check. Caveat: uses label 1.
   |.macro ffgccheck
-  |  cmp dword [DISPATCH+DISPATCH_GL(gc.debt)], 0
+  |  cmp dword [DISPATCH+DISPATCH_GL(gc.debt32)], 0
   |  jbe >1
   |  call ->fff_gcstep
   |1:

@@ -12,6 +12,7 @@
 #include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <malloc.h>
 
 #define lib_aux_c
 #define LUA_LIB
@@ -378,9 +379,10 @@ static int panic(lua_State *L)
 
 #ifdef LUAJIT_USE_SYSMALLOC
 
-#if LJ_64 && !defined(LUAJIT_USE_VALGRIND)
-#error "Must use builtin allocator for 64 bit target"
+#if LJ_64 && (!defined(LUAJIT_USE_VALGRIND) && !defined(__GLIBC__))
+#error "Must use builtin or glibc allocator for 64 bit target"
 #endif
+
 
 static void *mem_alloc(void *ud, void *ptr, size_t osize, size_t nsize)
 {
@@ -390,13 +392,35 @@ static void *mem_alloc(void *ud, void *ptr, size_t osize, size_t nsize)
     free(ptr);
     return NULL;
   } else {
-    return realloc(ptr, nsize);
+    void *p = realloc(ptr, nsize);
+#if LJ_64 && defined(__GLIBC__)
+    /* We hope that glibc will not reuse mmap()-ed region
+     * which was freed earlier. Mostly true, but not always. */
+    static int init = 0;
+    if (!init) {
+      mallopt(M_MMAP_THRESHOLD, LJ_MAX_MEM);
+      mallopt(M_MMAP_MAX, 0);
+      init = 1;
+    }
+    uint32_t ps = (uintptr_t) p;
+    uint32_t pe = ps + nsize;
+    if ((pe < ps) || ((uintptr_t) ps != (uintptr_t)p)) {
+      free(p);
+      return NULL;
+    }
+#endif
+    return p;
   }
 }
 
 LUALIB_API lua_State *luaL_newstate(void)
 {
-  lua_State *L = lua_newstate(mem_alloc, NULL);
+  lua_State *L;
+#if LJ_64
+  L = lj_state_newstate(mem_alloc, NULL);
+#else
+  L = lua_newstate(mem_alloc, NULL);
+#endif
   if (L) G(L)->panic = panic;
   return L;
 }

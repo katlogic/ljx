@@ -2448,7 +2448,7 @@ static void asm_gc_check(ASMState *as)
   /* jle skip_gc_step_jit */
   emit_sjcc(as, CC_LE, l_end);
   /* cmp [dword &J2G(as->J)->gc.debt], byte 0 */
-  as->mrm.ofs = ptr2addr(&J2G(as->J)->gc.debt);
+  as->mrm.ofs = ptr2addr(&J2G(as->J)->gc.debt32);
   as->mrm.base = as->mrm.idx = RID_NONE;
   as->mrm.scale = XM_SCALE1;
   emit_i8(as, 0);
