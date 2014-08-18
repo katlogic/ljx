@@ -144,7 +144,7 @@ XCFLAGS+= -DLUAJIT_ENABLE_LUA51COMPAT
 #
 # OTOH this option is mandatory for Valgrind's memcheck tool on x64 and
 # the only way to get useful results from it for all other architectures.
-XCFLAGS+= -DLUAJIT_USE_SYSMALLOC
+# XCFLAGS+= -DLUAJIT_USE_SYSMALLOC
 #
 # This define is required to run LuaJIT under Valgrind. The Valgrind
 # header files must be installed. You should enable debug information, too.
