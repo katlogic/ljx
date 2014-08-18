@@ -104,7 +104,7 @@ XCFLAGS=
 # enabled by default. Some other features that *might* break some existing
 # code (e.g. __pairs or os.execute() return values) can be enabled here.
 # It will also report version as Lua 5.1.
-XCONFIG+= -DLUAJIT_ENABLE_LUA51COMPAT
+XCFLAGS+= -DLUAJIT_ENABLE_LUA51COMPAT
 
 # Features from Lua 5.3, notably integer support.
 # (work in progress)

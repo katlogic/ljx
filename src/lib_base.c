@@ -286,7 +286,9 @@ LJLIB_ASM(tonumber)		LJLIB_REC(.)
     }
 #endif
   } else {
+#if !LJ_51
 strictnum:;
+#endif
     GCstr *str = lj_lib_checkstr(L, 1);
     const char *p = strdata(str);
     char *ep;

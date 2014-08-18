@@ -522,7 +522,7 @@ LJLIB_CF(ffi_new)	LJLIB_REC(.)
 	/* Add to finalizer table, if still enabled. */
 	copyTV(L, lj_tab_set(L, t, o-1), tv);
 	lj_gc_anybarriert(L, t);
-        lj_gc_checkfinalizer(L, o);
+        lj_gc_checkfinalizer(L, gcval(o));
       }
     }
 #else

@@ -1033,6 +1033,7 @@ LUA_API void lua_setfield(lua_State *L, int idx, const char *k)
   }
 }
 
+#if !LJ_51
 LUA_API void lua_setglobal (lua_State *L, const char *var)
 {
   return lua_setfield(L, LUA_GLOBALSINDEX, var);
@@ -1042,7 +1043,7 @@ LUA_API void lua_getglobal (lua_State *L, const char *var)
 {
   return lua_getfield(L, LUA_GLOBALSINDEX, var);
 }
-
+#endif
 
 LUA_API void lua_rawset(lua_State *L, int idx)
 {
