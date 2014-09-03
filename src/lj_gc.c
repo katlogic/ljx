@@ -273,7 +273,7 @@ static int gc_traverse_ephemeron(global_State *g, GCtab *t) {
       }
     }
   }
-  if (prop)
+  if (g->gc.state != GCSatomic && prop)
     linktable(t, g->gc.ephemeron)  /* have to propagate again */
   else if (hasclears)  /* does table have white keys? */
     linktable(t, g->gc.allweak)  /* may have to clean white keys */
