@@ -143,6 +143,7 @@ typedef struct MatchState {
   const char *p_end; /* end ('\0') of pattern */
   lua_State *L;
   int depth;
+  int backtracks;
 } MatchState;
 #define CAP_UNFINISHED	((MSize)(-1))
 #define CAP_POSITION	((MSize)(-2))

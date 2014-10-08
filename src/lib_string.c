@@ -330,7 +330,7 @@ static const char *match_capture(MatchState *ms, const char *s, int l)
 
 static const char *match(MatchState *ms, const char *s, const char *p)
 {
-  if (++ms->depth > LJ_MAX_XLEVEL)
+  if (++ms->depth > LJ_MAX_XLEVEL || ++ms->backtracks > LJ_MAX_MSBT)
     lj_err_caller(ms->L, LJ_ERR_STRPATX);
   init: /* using goto's to optimize tail recursion */
   if (p != ms->p_end) switch (*p) {
@@ -461,7 +461,7 @@ MatchState * ljx_str_match(lua_State *L, const char *s, const char *p, MSize sle
   ms->p_end = p + plen - anchor;
   do {  /* Loop through string and try to match the pattern. */
     const char *q;
-    ms->level = ms->depth = 0;
+    ms->level = ms->depth = ms->backtracks = 0;
     q = match(ms, sstr, p);
     if (q) {
       /* No capture - simulate one return capture. */
@@ -516,7 +516,7 @@ static int str_find_aux(lua_State *L, int find)
     ms.p_end = pstr + p->len - anchor;
     do {  /* Loop through string and try to match the pattern. */
       const char *q;
-      ms.level = ms.depth = 0;
+      ms.level = ms.depth = ms.backtracks = 0;
       q = match(&ms, sstr, pstr);
       if (q) {
 	if (find) {
@@ -558,7 +558,7 @@ LJLIB_NOREG LJLIB_CF(string_gmatch_aux)
   ms.p_end = p + pstr->len;
   for (; src <= ms.src_end; src++) {
     const char *e;
-    ms.level = ms.depth = 0;
+    ms.level = ms.depth = ms.backtracks = 0;
     if ((e = match(&ms, src, p)) != NULL) {
       int32_t pos = (int32_t)(e - s);
       if (e == src) pos++;  /* Ensure progress for empty match. */
@@ -653,7 +653,7 @@ LJLIB_CF(string_gsub)
   ms.p_end = p+pl-anchor;
   while (n < max_s) {
     const char *e;
-    ms.level = ms.depth = 0;
+    ms.level = ms.depth = ms.backtracks = 0;
     e = match(&ms, src, p);
     if (e) {
       n++;
