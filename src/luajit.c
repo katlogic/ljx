@@ -380,7 +380,7 @@ static void print_version(lua_State *L, int jit)
   fputs(", built " __DATE__, stdout);
 #endif
 #ifdef __VERSION__
-  fputs(" using GCC " __VERSION__ ")\n", stdout);
+  fputs(" using GCC " __VERSION__ "\n", stdout);
 #else
   fputs("\n", stdout);
 #endif
