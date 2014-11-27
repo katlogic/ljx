@@ -21,6 +21,9 @@
 #if LJ_53
 #define LUA_VERSION_MINOR       "3"
 #define LUA_VERSION_NUM         503
+#elif LJ_51
+#define LUA_VERSION_MINOR       "1"
+#define LUA_VERSION_NUM         501
 #else
 #define LUA_VERSION_MINOR       "2"
 #define LUA_VERSION_NUM         502

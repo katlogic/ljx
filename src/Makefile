@@ -101,15 +101,19 @@ XCFLAGS=
 #XCFLAGS+= -DLUAJIT_DISABLE_FFI
 #
 # Features from Lua 5.1 that are unlikely to break existing code are
-# enabled by default. Some other features that *might* break some existing
-# code (e.g. __pairs or os.execute() return values) can be enabled here.
-# It will also report version as Lua 5.1.
-XCFLAGS+= -DLUAJIT_ENABLE_LUA51COMPAT
-
+# enabled by default. Some other features that *might* break existing
+# code (e.g. __pairs or os.execute() return values) can be enabled
+# by this switch, making it behave pretty much like stock LuaJIT.
+#
+# It will also report version as Lua 5.1 and ABI will match 5.1
+# When not defined, LJX is 5.2 ABI compatible. Grep code
+# for XABI to see differences between 5.1/5.2 ABI.
+#
+# XCFLAGS+= -DLUAJIT_ENABLE_LUA51COMPAT
+#
 # Features from Lua 5.3, notably integer support.
 # (work in progress)
 # XCFLAGS+= -DLUAJIT_ENABLE_LUA53COMPAT
-
 #
 # This flag disables various kludges to emulate Lua Undefined/Underspecified
 # Behavior. Normally this is needed so buggy scripts continue to work,
