@@ -437,12 +437,12 @@ static MSize gc_traverse_frames(global_State *g, lua_State *th)
 {
   TValue *frame, *top = th->top-1, *bot = tvref(th->stack);
   /* Note: extra vararg frame not skipped, marks function twice (harmless). */
-  for (frame = th->base-1; frame > bot; frame = frame_prev(frame)) {
+  for (frame = th->base-1; frame > bot+LJ_FR2; frame = frame_prev(frame)) {
     GCfunc *fn = frame_func(frame);
     TValue *ftop = frame;
     if (isluafunc(fn)) ftop += funcproto(fn)->framesize;
     if (ftop > top) top = ftop;
-    gc_markobj(g, fn);  /* Need to mark hidden function (or L). */
+    if (!LJ_FR2) gc_markobj(g, fn);  /* Need to mark hidden function (or L). */
   }
   top++;  /* Correct bias of -1 (frame == base-1). */
   if (top > tvref(th->maxstack)) top = tvref(th->maxstack);
@@ -453,7 +453,7 @@ static MSize gc_traverse_frames(global_State *g, lua_State *th)
 static void gc_traverse_thread(global_State *g, lua_State *th)
 {
   TValue *o, *top = th->top;
-  for (o = tvref(th->stack)+1; o < top; o++)
+  for (o = tvref(th->stack)+1+LJ_FR2; o < top; o++)
     gc_marktv(g, o);
   if (g->gc.state == GCSinsideatomic) {
     top = tvref(th->stack) + th->stacksize;
@@ -537,7 +537,7 @@ static const GCFreeFunc gc_freefunc[] = {
 };
 
 /* Full sweep of a GC list. */
-#define gc_fullsweep(g, p)	gc_sweep(g, (p), LJ_MAX_MEM)
+#define gc_fullsweep(g, p)	gc_sweep(g, (p), ~(uint32_t)0)
 
 /* Partial sweep of a GC list. */
 static GCRef *gc_sweep(global_State *g, GCRef *p, uint32_t lim)
@@ -636,13 +636,13 @@ static void gc_call_finalizer(global_State *g, lua_State *L,
   int errcode;
   TValue *top;
   lj_trace_abort(g);
-  top = L->top;
-  L->top = top+2;
   hook_entergc(g);  /* Disable hooks and new traces during __gc. */
   g->gc.flags |= GCF_notrunning;  /* Prevent GC steps. */
   copyTV(L, top, mo);
-  setgcV(L, top+1, o, ~o->gch.gct);
-  errcode = lj_vm_pcall(L, top+1, 1+0, -1);  /* Stack: |mo|o| -> | */
+  if (LJ_FR2) setnilV(top++);
+  setgcV(L, top, o, ~o->gch.gct);
+  L->top = top+1;
+  errcode = lj_vm_pcall(L, top, 1+0, -1);  /* Stack: |mo|o| -> | */
   hook_restore(g, oldh);
   g->gc.flags &= ~GCF_notrunning;
   g->gc.flags |= oldr;  /* Restore GC state. */
@@ -881,6 +881,7 @@ static MDiff atomic(global_State *g, lua_State *L)
   g->strempty.marked = g->gc.currentwhite;
   work += g->gc.memtrav;  /* Complete counting. */
   return work;  /* estimate of memory marked by 'atomic' */
+  // TBD MERGE: setmref(g->gc.sweep, &g->gc.root);
 }
 
 static size_t gc_sweepstep(lua_State *L, global_State *g,
@@ -1051,7 +1052,7 @@ void lj_gc_fullgc(lua_State *L)
 
 /* -- Allocator ----------------------------------------------------------- */
 /* Call pluggable memory allocator to allocate or resize a fragment. */
-void *lj_mem_realloc(lua_State *L, void *p, MSize osz, MSize nsz)
+void *lj_mem_realloc(lua_State *L, void *p, GCSize osz, GCSize nsz)
 {
   global_State *g = G(L);
   lua_assert((osz == 0) == (p == NULL));
@@ -1067,7 +1068,7 @@ void *lj_mem_realloc(lua_State *L, void *p, MSize osz, MSize nsz)
 }
 
 /* Allocate new GC object and link it to the root set. */
-void * LJ_FASTCALL lj_mem_newgco(lua_State *L, MSize size)
+void * LJ_FASTCALL lj_mem_newgco(lua_State *L, GCSize size)
 {
   global_State *g = G(L);
   GCobj *o = (GCobj *)g->allocf(g->allocd, NULL, 0, size);

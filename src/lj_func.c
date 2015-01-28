@@ -1,6 +1,6 @@
 /*
 ** Function handling (prototypes, functions and upvalues).
-** Copyright (C) 2005-2014 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2015 Mike Pall. See Copyright Notice in luajit.h
 **
 ** Upvalue handling rewrite and closure lifting.
 ** Copyright (C) 2014 Karel Tuma. See Copyright Notice in luajit.h

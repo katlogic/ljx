@@ -1,6 +1,6 @@
 /*
 ** String library.
-** Copyright (C) 2005-2014 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2015 Mike Pall. See Copyright Notice in luajit.h
 **
 ** Lua 5.2 semantics and string.match() compiling
 ** Copyright (C) 2014 Karel Tuma. See Copyright Notice in luajit.h
@@ -61,7 +61,7 @@ LJLIB_ASM(string_byte)		LJLIB_REC(string_range 0)
   lj_state_checkstack(L, (MSize)n);
   p = (const unsigned char *)strdata(s) + start;
   for (i = 0; i < n; i++)
-    setintV(L->base + i-1, p[i]);
+    setintV(L->base + i-1-LJ_FR2, p[i]);
   return FFH_RES(n);
 }
 
@@ -75,7 +75,7 @@ LJLIB_ASM(string_char)		LJLIB_REC(.)
       lj_err_arg(L, i, LJ_ERR_BADVAL);
     buf[i-1] = (char)k;
   }
-  setstrV(L, L->base-1, lj_str_new(L, buf, (size_t)nargs));
+  setstrV(L, L->base-1-LJ_FR2, lj_str_new(L, buf, (size_t)nargs));
   return FFH_RES(1);
 }
 

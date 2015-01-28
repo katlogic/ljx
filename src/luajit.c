@@ -1,6 +1,6 @@
 /*
 ** LuaJIT frontend. Runs commands, scripts, read-eval-print (REPL) etc.
-** Copyright (C) 2005-2014 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2015 Mike Pall. See Copyright Notice in luajit.h
 **
 ** Advanced readline support for the GNU readline and history
 ** libraries or compatible replacements taken from Mike's Lua patch.

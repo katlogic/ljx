@@ -1,6 +1,6 @@
 /*
 ** Assembler VM interface definitions.
-** Copyright (C) 2005-2014 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2015 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #ifndef _LJ_VM_H
@@ -50,7 +50,7 @@ LJ_ASMF void lj_vm_exit_handler(void);
 LJ_ASMF void lj_vm_exit_interp(void);
 
 /* Internal math helper functions. */
-#if LJ_TARGET_PPC
+#if LJ_TARGET_PPC || LJ_TARGET_ARM64
 #define lj_vm_floor	floor
 #define lj_vm_ceil	ceil
 #else
@@ -77,7 +77,7 @@ LJ_ASMF void lj_vm_powi_sse(void);
 #else
 LJ_ASMF double lj_vm_powi(double, int32_t);
 #endif
-#if LJ_TARGET_PPC
+#if LJ_TARGET_PPC || LJ_TARGET_ARM64
 #define lj_vm_trunc	trunc
 #else
 LJ_ASMF double lj_vm_trunc(double);
@@ -104,8 +104,6 @@ LJ_ASMF void lj_cont_condt(void);  /* Branch if result is true. */
 LJ_ASMF void lj_cont_condf(void);  /* Branch if result is false. */
 LJ_ASMF void lj_cont_hook(void);  /* Continue from hook yield. */
 LJ_ASMF void lj_cont_stitch(void);  /* Trace stitching. */
-
-enum { LJ_CONT_TAILCALL, LJ_CONT_FFI_CALLBACK };  /* Special continuations. */
 
 /* Start of the ASM code. */
 LJ_ASMF char lj_vm_asm_begin[];

@@ -1,6 +1,6 @@
 /*
 ** Base and coroutine library.
-** Copyright (C) 2005-2014 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2015 Mike Pall. See Copyright Notice in luajit.h
 **
 ** Major portions taken verbatim or adapted from the Lua interpreter.
 ** Copyright (C) 1994-2011 Lua.org, PUC-Rio. See Copyright Notice in lua.h
@@ -87,10 +87,11 @@ static int ffh_pairs(lua_State *L, MMS mm)
   cTValue *mo = lj_meta_lookup(L, o, mm);
   if (!tvisnil(mo)) {
     L->top = o+1;  /* Only keep one argument. */
-    copyTV(L, L->base-1, mo);  /* Replace callable. */
+    copyTV(L, L->base-1-LJ_FR2, mo);  /* Replace callable. */
     return FFH_TAILCALL;
   } else {
     if (!tvistab(o)) lj_err_argt(L, 1, LUA_TTABLE);
+    if (LJ_FR2) { copyTV(L, o-1, o); o--; }
     setfuncV(L, o-1, funcV(lj_lib_upvalue(L, 1)));
     if (mm == MM_pairs) setnilV(o+1); else setintV(o+1, 0);
     return FFH_RES(3);
@@ -133,7 +134,7 @@ LJLIB_ASM(setmetatable)		LJLIB_REC(.)
       lj_gc_checkfinalizer(L, obj2gco(t));
     lj_gc_objbarriert(L, t, mt);
   }
-  settabV(L, L->base-1, t);
+  settabV(L, L->base-1-LJ_FR2, t);
   return FFH_RES(1);
 }
 
@@ -146,6 +147,7 @@ LJLIB_CF(getfenv)		LJLIB_REC(.)
     o = lj_debug_frame(L, level, &level);
     if (o == NULL)
       lj_err_arg(L, 1, LJ_ERR_INVLVL);
+    if (LJ_FR2) o--;
   }
   fn = &gcval(o)->fn;
   settabV(L, L->top++, isluafunc(fn) ? tabref(fn->l.env) : tabref(L->env));
@@ -167,6 +169,7 @@ LJLIB_CF(setfenv)
     o = lj_debug_frame(L, level, &level);
     if (o == NULL)
       lj_err_arg(L, 1, LJ_ERR_INVLVL);
+    if (LJ_FR2) o--;
   }
   fn = &gcval(o)->fn;
   if (!isluafunc(fn))
@@ -263,7 +266,7 @@ LJLIB_ASM(tonumber)		LJLIB_REC(.)
     int i; if (tvisstr(o)) for (i = 0; i < strV(o)->len; i++) if (!strdata(strV(o))[i]) goto strictnum;
 #endif
     if (lj_strscan_numberobj(o)) {
-      copyTV(L, L->base-1, o);
+      copyTV(L, L->base-1-LJ_FR2, o);
       return FFH_RES(1);
     }
 #if LJ_HASFFI
@@ -276,11 +279,11 @@ LJLIB_ASM(tonumber)		LJLIB_REC(.)
 	    ct->size <= 4 && !(ct->size == 4 && (ct->info & CTF_UNSIGNED))) {
 	  int32_t i;
 	  lj_cconv_ct_tv(cts, ctype_get(cts, CTID_INT32), (uint8_t *)&i, o, 0);
-	  setintV(L->base-1, i);
+	  setintV(L->base-1-LJ_FR2, i);
 	  return FFH_RES(1);
 	}
 	lj_cconv_ct_tv(cts, ctype_get(cts, CTID_DOUBLE),
-		       (uint8_t *)&(L->base-1)->n, o, 0);
+		       (uint8_t *)&(L->base-1-LJ_FR2)->n, o, 0);
 	return FFH_RES(1);
       }
     }
@@ -300,14 +303,14 @@ strictnum:;
       while (lj_char_isspace((unsigned char)(*ep))) ep++;
       if (ep == (p+str->len)) {
 	if (LJ_DUALNUM && LJ_LIKELY(ul < 0x80000000u))
-	  setintV(L->base-1, (int32_t)ul);
+	  setintV(L->base-1-LJ_FR2, (int32_t)ul);
 	else
-	  setnumV(L->base-1, (lua_Number)((long)ul));
+	  setnumV(L->base-1-LJ_FR2, (lua_Number)ul);
 	return FFH_RES(1);
       }
     }
   }
-  setnilV(L->base-1);
+  setnilV(L->base-1-LJ_FR2);
   return FFH_RES(1);
 }
 
@@ -317,11 +320,11 @@ LJLIB_ASM(tostring)		LJLIB_REC(.)
   cTValue *mo;
   L->top = o+1;  /* Only keep one argument. */
   if (!tvisnil(mo = lj_meta_lookup(L, o, MM_tostring))) {
-    copyTV(L, L->base-1, mo);  /* Replace callable. */
+    copyTV(L, L->base-1-LJ_FR2, mo);  /* Replace callable. */
     return FFH_TAILCALL;
   }
   lj_gc_check(L);
-  setstrV(L, L->base-1, lj_strfmt_obj(L, L->base));
+  setstrV(L, L->base-1-LJ_FR2, lj_strfmt_obj(L, L->base));
   return FFH_RES(1);
 }
 
@@ -553,7 +556,7 @@ LJLIB_CF(coroutine_status)
   if (co == L) s = "running";
   else if (co->status == LUA_YIELD) s = "suspended";
   else if (co->status != 0) s = "dead";
-  else if (co->base > tvref(co->stack)+1) s = "normal";
+  else if (co->base > tvref(co->stack)+1+LJ_FR2) s = "normal";
   else if (co->top == co->base) s = "dead";
   else s = "suspended";
   lua_pushstring(L, s);
@@ -589,8 +592,8 @@ static int ffh_resume(lua_State *L, lua_State *co, int wrap)
       (co->status == 0 && co->top == co->base)) {
     ErrMsg em = co->cframe ? LJ_ERR_CORUN : LJ_ERR_CODEAD;
     if (wrap) lj_err_caller(L, em);
-    setboolV(L->base-1, 0);
-    setstrV(L, L->base, lj_err_str(L, em));
+    setboolV(L->base-1-LJ_FR2, 0);
+    setstrV(L, L->base-LJ_FR2, lj_err_str(L, em));
     return FFH_RES(2);
   }
   lj_state_growstack(co, (MSize)(L->top - L->base));

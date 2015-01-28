@@ -1,6 +1,6 @@
 /*
 ** Math helper functions for assembler VM.
-** Copyright (C) 2005-2014 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2015 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #define lj_vmmath_c
@@ -73,7 +73,7 @@ double lj_vm_exp2(double a)
 }
 #endif
 
-#if !(LJ_TARGET_ARM || LJ_TARGET_PPC)
+#if !(LJ_TARGET_ARM || LJ_TARGET_ARM64 || LJ_TARGET_PPC)
 int32_t LJ_FASTCALL lj_vm_modi(int32_t a, int32_t b)
 {
   uint32_t y, ua, ub;

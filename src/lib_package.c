@@ -1,6 +1,6 @@
 /*
 ** Package library.
-** Copyright (C) 2005-2014 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2015 Mike Pall. See Copyright Notice in luajit.h
 **
 ** Lua 5.2 port
 ** Copyright (C) 2014 Karel Tuma. See Copyright Notice in luajit.h
@@ -245,7 +245,7 @@ static int ll_loadfunc(lua_State *L, const char *path, const char *name, int r)
       const char *bcdata = ll_bcsym(reg, mksymname(L, name, SYMPREFIX_BC));
       lua_pop(L, 1);
       if (bcdata) {
-	if (luaL_loadbuffer(L, bcdata, LJ_MAX_MEM, name) != 0)
+	if (luaL_loadbuffer(L, bcdata, LJ_MAX_BUF, name) != 0)
 	  return PACKAGE_ERR_LOAD;
 	return 0;
       }
@@ -395,7 +395,7 @@ static int lj_cf_package_loader_preload(lua_State *L)
   if (lua_isnil(L, -1)) {  /* Not found? */
     const char *bcname = mksymname(L, name, SYMPREFIX_BC);
     const char *bcdata = ll_bcsym(NULL, bcname);
-    if (bcdata == NULL || luaL_loadbuffer(L, bcdata, LJ_MAX_MEM, name) != 0)
+    if (bcdata == NULL || luaL_loadbuffer(L, bcdata, LJ_MAX_BUF, name) != 0)
       lua_pushfstring(L, "\n\tno field package.preload['%s']", name);
   }
   return 1;

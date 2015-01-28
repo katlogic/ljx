@@ -3,7 +3,7 @@
 ** Copyright (C) 2005-2014 Mike Pall. See Copyright Notice in luajit.h
 **
 ** Minor FFI API extensions
-** Copyright (C) 2005-2014 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2014 Karel Tuma
 */
 
 #define lj_ffrecord_c
@@ -1126,7 +1126,7 @@ static void crec_snap_caller(jit_State *J)
   ptrdiff_t delta;
   if (!frame_islua(base-1) || J->framedepth <= 0)
     lj_trace_err(J, LJ_TRERR_NYICALL);
-  J->pc = frame_pc(base-1); delta = 1+bc_a(J->pc[-1]);
+  J->pc = frame_pc(base-1); delta = 1+LJ_FR2+bc_a(J->pc[-1]);
   L->top = base; L->base = base - delta;
   J->base[-1] = TREF_FALSE;
   J->base -= delta; J->baseslot -= (BCReg)delta;
@@ -1487,8 +1487,7 @@ void LJ_FASTCALL recff_cdata_arith(jit_State *J, RecordFFData *rd)
 	!irt_isguard(J->guardemit)) {
       const BCIns *pc = frame_contpc(J->L->base-1) - 1;
       if (bc_op(*pc) <= BC_ISNEP) {
-	setframe_pc(&J2G(J)->tmptv, pc);
-	J2G(J)->tmptv.u32.lo = ((tref_istrue(tr) ^ bc_op(*pc)) & 1);
+	J2G(J)->tmptv.u64 = (uint64_t)(uintptr_t)pc;
 	J->postproc = LJ_POST_FIXCOMP;
       }
     }
