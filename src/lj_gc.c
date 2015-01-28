@@ -638,7 +638,8 @@ static void gc_call_finalizer(global_State *g, lua_State *L,
   lj_trace_abort(g);
   hook_entergc(g);  /* Disable hooks and new traces during __gc. */
   g->gc.flags |= GCF_notrunning;  /* Prevent GC steps. */
-  copyTV(L, top, mo);
+  top = L->top;
+  copyTV(L, top++, mo);
   if (LJ_FR2) setnilV(top++);
   setgcV(L, top, o, ~o->gch.gct);
   L->top = top+1;
