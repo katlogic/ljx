@@ -87,7 +87,7 @@ LUALIB_API const char *luaL_findtable(lua_State *L, int idx,
 				      const char *fname, int szhint)
 {
   const char *e;
-  lua_pushvalue(L, idx);
+  if (idx) lua_pushvalue(L, idx);
   do {
     e = strchr(fname, '.');
     if (e == NULL) e = fname + strlen(fname);
