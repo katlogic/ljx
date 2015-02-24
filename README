@@ -1,13 +1,15 @@
 LuaJIT experimental
 -------------------
 Mostly 5.2 complete, with bits of 5.3.
+i386/x64 only (other archs are adhoc ported per demand)
 
-No handholding, here be dragons ahead. This is a fork tracks Mike's bleeding
-edge repo, and then adds its own fragile hacks on top of it.
+No handholding, here be dragons ahead. This fork tracks Mike's bleeding
+edge repo, with lots of its own fragile hacks mixed in.
 
 There are no releases planned as of yet - development, testing, deployment all
 happens in rolling fashion from git head (with reverts to put out inevitable
-occasional fires). Users are expected to be at least capable of git bisect.
+occasional fires). Users are expected to be capable of git bisect when asking
+for support.
 
-Definitely not for the faint of heart, especially if you're looking for
+Definitely not for the faint of the heart, especially if you're looking for
 "stable 5.2 Luajit" to ship with your product.
