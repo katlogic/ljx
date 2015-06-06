@@ -320,13 +320,6 @@
 |
 |//-----------------------------------------------------------------------
 |
-|// These basic macros should really be part of DynASM.
-|.macro srwi, rx, ry, n; rlwinm rx, ry, 32-n, n, 31; .endmacro
-|.macro slwi, rx, ry, n; rlwinm rx, ry, n, 0, 31-n; .endmacro
-|.macro rotlwi, rx, ry, n; rlwinm rx, ry, n, 0, 31; .endmacro
-|.macro rotlw, rx, ry, rn; rlwnm rx, ry, rn, 0, 31; .endmacro
-|.macro subi, rx, ry, i; addi rx, ry, -i; .endmacro
-|
 |// Trap for not-yet-implemented parts.
 |.macro NYI; tw 4, sp, sp; .endmacro
 |
@@ -4269,13 +4262,13 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  lwz TAB:CARG2, 4(RB)
     |.if DUALNUM
     |  add RC, BASE, RC
-    |    lbz TMP3, TAB:RB->marked
+    |    lbz TMP3, TAB:CARG2->marked
     |  lwz TMP0, TAB:CARG2->asize
     |  lwz CARG3, 4(RC)
     |   lwz TMP1, TAB:CARG2->array
     |.else
     |  lfdx f0, BASE, RC
-    |    lbz TMP3, TAB:RB->marked
+    |    lbz TMP3, TAB:CARG2->marked
     |  lwz TMP0, TAB:CARG2->asize
     |  toint CARG3, f0
     |   lwz TMP1, TAB:CARG2->array

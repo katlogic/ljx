@@ -442,7 +442,7 @@ LJLIB_CF(dofile)
 
 LJLIB_CF(gcinfo)
 {
-  setintV(L->top++, (G(L)->gc.total >> 10));
+  setintV(L->top++, (int32_t)(G(L)->gc.total >> 10));
   return 1;
 }
 
