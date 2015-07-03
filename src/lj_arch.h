@@ -119,6 +119,12 @@
 #define LJ_TARGET_CONSOLE	1
 #endif
 
+#ifdef _DURANGO
+#define LJ_TARGET_XBOXONE	1
+#define LJ_TARGET_CONSOLE	1
+#define LJ_TARGET_GC64		1
+#endif
+
 #define LJ_NUMMODE_SINGLE	0	/* Single-number mode only. */
 #define LJ_NUMMODE_SINGLE_DUAL	1	/* Default to single-number mode. */
 #define LJ_NUMMODE_DUAL		2	/* Dual-number mode only. */
@@ -497,7 +503,7 @@
 #define LUAJIT_NO_EXP2
 #endif
 
-#if defined(LUAJIT_NO_UNWIND) || defined(__symbian__) || LJ_TARGET_IOS || LJ_TARGET_PS3
+#if defined(LUAJIT_NO_UNWIND) || defined(__symbian__) || LJ_TARGET_IOS || LJ_TARGET_PS3 || LJ_TARGET_PS4
 #define LJ_NO_UNWIND		1
 #endif
 
