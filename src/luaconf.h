@@ -39,7 +39,11 @@
 #define LUA_LMULTILIB	"lib"
 #endif
 #define LUA_LROOT	"/usr/local"
+#if LUAJIT_ENABLE_LUA51COMPAT
+#define LUA_LUADIR	"/lua/5.1/"
+#else
 #define LUA_LUADIR	"/lua/5.2/"
+#endif
 #define LUA_LJDIR	"/luajit-" LJX_VERSION "/"
 
 #ifdef LUA_ROOT

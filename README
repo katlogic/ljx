@@ -4,7 +4,7 @@ Mostly 5.2 complete, with bits of 5.3.
 i386/x64 only (other archs are adhoc ported per demand)
 
 No handholding, here be dragons ahead. This fork tracks Mike's bleeding
-edge repo, with lots of its own fragile hacks mixed in.
+edge repo, with lots of our own fragile hacks mixed in.
 
 There are no releases planned as of yet - development, testing, deployment all
 happens in rolling fashion from git head (with reverts to put out inevitable
