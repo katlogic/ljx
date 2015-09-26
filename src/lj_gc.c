@@ -782,7 +782,6 @@ void lj_gc_setdebt(global_State *g, MDiff debt)
 {
   g->gc.total -= (debt - g->gc.debt);
   g->gc.debt = debt;
-  g->gc.debt32 = debt > 0;
 }
 
 /* Estimate pause to wait between gc cycles. */
@@ -1055,6 +1054,7 @@ void lj_gc_fullgc(lua_State *L)
 /* Call pluggable memory allocator to allocate or resize a fragment. */
 void *lj_mem_realloc(lua_State *L, void *p, GCSize osz, GCSize nsz)
 {
+  MDiff resize = nsz - osz;
   global_State *g = G(L);
   lua_assert((osz == 0) == (p == NULL));
   p = g->allocf(g->allocd, p, osz, nsz);
@@ -1062,9 +1062,15 @@ void *lj_mem_realloc(lua_State *L, void *p, GCSize osz, GCSize nsz)
     lj_err_mem(L);
   lua_assert((nsz == 0) == (p == NULL));
   lua_assert(checkptr32(p));
-  g->gc.debt -= osz;
-  g->gc.debt += nsz;
-  g->gc.debt32 = g->gc.debt > 0;
+  /* Clamp debt. TBD: faster. */
+  if (resize >= 0) {
+    if ((MDiff)(g->gc.debt + resize) < g->gc.debt)
+      return p;
+  } else {
+    if ((MDiff)(g->gc.debt + resize) > g->gc.debt)
+      return p;
+  }
+  g->gc.debt = (g->gc.debt - osz) + nsz;
   return p;
 }
 

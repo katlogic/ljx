@@ -23,8 +23,8 @@ typedef uint64_t GCSize;
 typedef uint32_t GCSize;
 #endif
 
-/* Memory size difference. 64bit to fit 4GB with sign. */
-typedef int64_t MDiff;
+/* Memory size difference */
+typedef int32_t MDiff;
 
 /* Memory reference */
 typedef struct MRef {
@@ -626,9 +626,8 @@ typedef struct GCState {
   MDiff stepmul;	/* Incremental GC step granularity. */
   MDiff estimate;	/* Estimate of memory actually in use. */
   MDiff pause;		/* Pause between successive GC cycles. */
-  MDiff total;
-  MDiff debt;
-  uint32_t debt32;      /* Temporary hack. TBD: Make JIT code use 64 bit access. */
+  MSize total;
+  MDiff debt;            /* Bytes allocated not yet compensated by the collector */
 } GCState;
 
 /* Global state, shared by all threads of a Lua universe. */

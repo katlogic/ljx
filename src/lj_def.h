@@ -46,7 +46,7 @@ typedef unsigned int uintptr_t;
 #include <stdlib.h>
 
 /* Various VM limits. */
-#define LJ_MAX_MEM32	0xffffff00	/* Max. 32 bit memory allocation. */
+#define LJ_MAX_MEM32	0xffff0000	/* Max. 32 bit memory allocation. */
 #define LJ_MAX_MEM64	((uint64_t)1<<47)  /* Max. 64 bit memory allocation. */
 /* Max. total memory allocation. */
 #define LJ_MAX_MEM	(LJ_GC64 ? LJ_MAX_MEM64 : LJ_MAX_MEM32)
