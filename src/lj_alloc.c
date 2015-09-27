@@ -31,15 +31,13 @@
 #include "lj_def.h"
 #include "lj_arch.h"
 #include "lj_alloc.h"
+#include "lj_mmap.h"
 
 #ifndef LUAJIT_USE_SYSMALLOC
 
-#define MAX_SIZE_T		(~(size_t)0)
+#define IS_DIRECT_BIT          (SIZE_T_ONE)
 #define MALLOC_ALIGNMENT	((size_t)8U)
-
-#define DEFAULT_GRANULARITY	((size_t)128U * (size_t)1024U)
 #define DEFAULT_TRIM_THRESHOLD	((size_t)2U * (size_t)1024U * (size_t)1024U)
-#define DEFAULT_MMAP_THRESHOLD	((size_t)128U * (size_t)1024U)
 #define MAX_RELEASE_CHECK_RATE	255
 
 /* ------------------- size_t and alignment properties -------------------- */
@@ -64,250 +62,6 @@
 #define align_offset(A)\
  ((((size_t)(A) & CHUNK_ALIGN_MASK) == 0)? 0 :\
   ((MALLOC_ALIGNMENT - ((size_t)(A) & CHUNK_ALIGN_MASK)) & CHUNK_ALIGN_MASK))
-
-/* -------------------------- MMAP support ------------------------------- */
-
-#define MFAIL			((void *)(MAX_SIZE_T))
-#define CMFAIL			((char *)(MFAIL)) /* defined for convenience */
-
-#define IS_DIRECT_BIT		(SIZE_T_ONE)
-
-#if LJ_TARGET_WINDOWS
-
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-
-#if LJ_64 && !LJ_GC64
-
-/* Undocumented, but hey, that's what we all love so much about Windows. */
-typedef long (*PNTAVM)(HANDLE handle, void **addr, ULONG zbits,
-		       size_t *size, ULONG alloctype, ULONG prot);
-static PNTAVM ntavm;
-
-/* Number of top bits of the lower 32 bits of an address that must be zero.
-** Apparently 0 gives us full 64 bit addresses and 1 gives us the lower 2GB.
-*/
-#define NTAVM_ZEROBITS		1
-
-static void INIT_MMAP(void)
-{
-  ntavm = (PNTAVM)GetProcAddress(GetModuleHandleA("ntdll.dll"),
-				 "NtAllocateVirtualMemory");
-}
-
-/* Win64 32 bit MMAP via NtAllocateVirtualMemory. */
-static LJ_AINLINE void *CALL_MMAP(size_t size)
-{
-  DWORD olderr = GetLastError();
-  void *ptr = NULL;
-  long st = ntavm(INVALID_HANDLE_VALUE, &ptr, NTAVM_ZEROBITS, &size,
-		  MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
-  SetLastError(olderr);
-  return st == 0 ? ptr : MFAIL;
-}
-
-/* For direct MMAP, use MEM_TOP_DOWN to minimize interference */
-static LJ_AINLINE void *DIRECT_MMAP(size_t size)
-{
-  DWORD olderr = GetLastError();
-  void *ptr = NULL;
-  long st = ntavm(INVALID_HANDLE_VALUE, &ptr, NTAVM_ZEROBITS, &size,
-		  MEM_RESERVE|MEM_COMMIT|MEM_TOP_DOWN, PAGE_READWRITE);
-  SetLastError(olderr);
-  return st == 0 ? ptr : MFAIL;
-}
-
-#else
-
-#define INIT_MMAP()		((void)0)
-
-/* Win32 MMAP via VirtualAlloc */
-static LJ_AINLINE void *CALL_MMAP(size_t size)
-{
-  DWORD olderr = GetLastError();
-  void *ptr = VirtualAlloc(0, size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
-  SetLastError(olderr);
-  return ptr ? ptr : MFAIL;
-}
-
-/* For direct MMAP, use MEM_TOP_DOWN to minimize interference */
-static LJ_AINLINE void *DIRECT_MMAP(size_t size)
-{
-  DWORD olderr = GetLastError();
-  void *ptr = VirtualAlloc(0, size, MEM_RESERVE|MEM_COMMIT|MEM_TOP_DOWN,
-			   PAGE_READWRITE);
-  SetLastError(olderr);
-  return ptr ? ptr : MFAIL;
-}
-
-#endif
-
-/* This function supports releasing coalesed segments */
-static LJ_AINLINE int CALL_MUNMAP(void *ptr, size_t size)
-{
-  DWORD olderr = GetLastError();
-  MEMORY_BASIC_INFORMATION minfo;
-  char *cptr = (char *)ptr;
-  while (size) {
-    if (VirtualQuery(cptr, &minfo, sizeof(minfo)) == 0)
-      return -1;
-    if (minfo.BaseAddress != cptr || minfo.AllocationBase != cptr ||
-	minfo.State != MEM_COMMIT || minfo.RegionSize > size)
-      return -1;
-    if (VirtualFree(cptr, 0, MEM_RELEASE) == 0)
-      return -1;
-    cptr += minfo.RegionSize;
-    size -= minfo.RegionSize;
-  }
-  SetLastError(olderr);
-  return 0;
-}
-
-#else
-
-#include <errno.h>
-#include <sys/mman.h>
-
-#define MMAP_PROT		(PROT_READ|PROT_WRITE)
-#if !defined(MAP_ANONYMOUS) && defined(MAP_ANON)
-#define MAP_ANONYMOUS		MAP_ANON
-#endif
-#define MMAP_FLAGS		(MAP_PRIVATE|MAP_ANONYMOUS)
-
-#if LJ_64 && !LJ_GC64
-/* 64 bit mode with 32 bit pointers needs special support for allocating
-** memory in the lower 2GB.
-*/
-
-#if defined(MAP_32BIT)
-
-#if defined(__sun__)
-#define MMAP_REGION_START	((uintptr_t)0x1000)
-#else
-/* Actually this only gives us max. 1GB in current Linux kernels. */
-#define MMAP_REGION_START	((uintptr_t)0)
-#endif
-
-static LJ_AINLINE void *CALL_MMAP(size_t size)
-{
-  int olderr = errno;
-  void *ptr = mmap((void *)MMAP_REGION_START, size, MMAP_PROT, MAP_32BIT|MMAP_FLAGS, -1, 0);
-  errno = olderr;
-  return ptr;
-}
-
-#elif LJ_TARGET_OSX || LJ_TARGET_PS4 || defined(__FreeBSD__) || defined(__FreeBSD_kernel__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__DragonFly__) || defined(__sun__) || defined(__CYGWIN__)
-
-/* OSX and FreeBSD mmap() use a naive first-fit linear search.
-** That's perfect for us. Except that -pagezero_size must be set for OSX,
-** otherwise the lower 4GB are blocked. And the 32GB RLIMIT_DATA needs
-** to be reduced to 250MB on FreeBSD.
-*/
-#if LJ_TARGET_OSX || defined(__DragonFly__)
-#define MMAP_REGION_START	((uintptr_t)0x10000)
-#elif LJ_TARGET_PS4
-#define MMAP_REGION_START	((uintptr_t)0x4000)
-#else
-#define MMAP_REGION_START	((uintptr_t)0x10000000)
-#endif
-#define MMAP_REGION_END		((uintptr_t)0x80000000)
-
-#if (defined(__FreeBSD__) || defined(__FreeBSD_kernel__)) && !LJ_TARGET_PS4
-#include <sys/resource.h>
-#endif
-
-static LJ_AINLINE void *CALL_MMAP(size_t size)
-{
-  int olderr = errno;
-  /* Hint for next allocation. Doesn't need to be thread-safe. */
-  static uintptr_t alloc_hint = MMAP_REGION_START;
-  int retry = 0;
-#if (defined(__FreeBSD__) || defined(__FreeBSD_kernel__)) && !LJ_TARGET_PS4
-  static int rlimit_modified = 0;
-  if (LJ_UNLIKELY(rlimit_modified == 0)) {
-    struct rlimit rlim;
-    rlim.rlim_cur = rlim.rlim_max = MMAP_REGION_START;
-    setrlimit(RLIMIT_DATA, &rlim);  /* Ignore result. May fail below. */
-    rlimit_modified = 1;
-  }
-#endif
-  for (;;) {
-    void *p = mmap((void *)alloc_hint, size, MMAP_PROT, MMAP_FLAGS, -1, 0);
-    if ((uintptr_t)p >= MMAP_REGION_START &&
-	(uintptr_t)p + size < MMAP_REGION_END) {
-      alloc_hint = (uintptr_t)p + size;
-      errno = olderr;
-      return p;
-    }
-    if (p != CMFAIL) munmap(p, size);
-#if defined(__sun__) || defined(__DragonFly__)
-    alloc_hint += 0x1000000;  /* Need near-exhaustive linear scan. */
-    if (alloc_hint + size < MMAP_REGION_END) continue;
-#endif
-    if (retry) break;
-    retry = 1;
-    alloc_hint = MMAP_REGION_START;
-  }
-  errno = olderr;
-  return CMFAIL;
-}
-
-#else
-
-#error "NYI: need an equivalent of MAP_32BIT for this 64 bit OS"
-
-#endif
-
-#else
-
-/* 32 bit mode and GC64 mode is easy. */
-static LJ_AINLINE void *CALL_MMAP(size_t size)
-{
-  int olderr = errno;
-  void *ptr = mmap(NULL, size, MMAP_PROT, MMAP_FLAGS, -1, 0);
-  errno = olderr;
-  return ptr;
-}
-
-#endif
-
-#define INIT_MMAP()		((void)0)
-#define DIRECT_MMAP(s)		CALL_MMAP(s)
-
-static LJ_AINLINE int CALL_MUNMAP(void *ptr, size_t size)
-{
-  int olderr = errno;
-  int ret = munmap(ptr, size);
-  errno = olderr;
-  return ret;
-}
-
-#if LJ_TARGET_LINUX
-/* Need to define _GNU_SOURCE to get the mremap prototype. */
-static LJ_AINLINE void *CALL_MREMAP_(void *ptr, size_t osz, size_t nsz,
-				     int flags)
-{
-  int olderr = errno;
-  ptr = mremap(ptr, osz, nsz, flags);
-  errno = olderr;
-  return ptr;
-}
-
-#define CALL_MREMAP(addr, osz, nsz, mv) CALL_MREMAP_((addr), (osz), (nsz), (mv))
-#define CALL_MREMAP_NOMOVE	0
-#define CALL_MREMAP_MAYMOVE	1
-#if LJ_64 && !LJ_GC64
-#define CALL_MREMAP_MV		CALL_MREMAP_NOMOVE
-#else
-#define CALL_MREMAP_MV		CALL_MREMAP_MAYMOVE
-#endif
-#endif
-
-#endif
-
-#ifndef CALL_MREMAP
-#define CALL_MREMAP(addr, osz, nsz, mv) ((void)osz, MFAIL)
-#endif
 
 /* -----------------------  Chunk representations ------------------------ */
 
@@ -461,6 +215,7 @@ struct malloc_state {
   mchunkptr  smallbins[(NSMALLBINS+1)*2];
   tbinptr    treebins[NTREEBINS];
   msegment   seg;
+  mmap_info  mi;
 };
 
 typedef struct malloc_state *mstate;
@@ -468,21 +223,6 @@ typedef struct malloc_state *mstate;
 #define is_initialized(M)	((M)->top != 0)
 
 /* -------------------------- system alloc setup ------------------------- */
-
-/* page-align a size */
-#define page_align(S)\
- (((S) + (LJ_PAGESIZE - SIZE_T_ONE)) & ~(LJ_PAGESIZE - SIZE_T_ONE))
-
-/* granularity-align a size */
-#define granularity_align(S)\
-  (((S) + (DEFAULT_GRANULARITY - SIZE_T_ONE))\
-   & ~(DEFAULT_GRANULARITY - SIZE_T_ONE))
-
-#if LJ_TARGET_WINDOWS
-#define mmap_align(S)	granularity_align(S)
-#else
-#define mmap_align(S)	page_align(S)
-#endif
 
 /*  True if segment S holds address A */
 #define segment_holds(S, A)\
@@ -743,11 +483,11 @@ static int has_segment_link(mstate m, msegmentptr ss)
 
 /* -----------------------  Direct-mmapping chunks ----------------------- */
 
-static void *direct_alloc(size_t nb)
+static void *direct_alloc(mstate m, size_t nb)
 {
   size_t mmsize = mmap_align(nb + SIX_SIZE_T_SIZES + CHUNK_ALIGN_MASK);
   if (LJ_LIKELY(mmsize > nb)) {     /* Check for wrap around 0 */
-    char *mm = (char *)(DIRECT_MMAP(mmsize));
+    char *mm = (char *)(DIRECT_MMAP(m->mi, mmsize));
     if (mm != CMFAIL) {
       size_t offset = align_offset(chunk2mem(mm));
       size_t psize = mmsize - offset - DIRECT_FOOT_PAD;
@@ -762,7 +502,7 @@ static void *direct_alloc(size_t nb)
   return NULL;
 }
 
-static mchunkptr direct_resize(mchunkptr oldp, size_t nb)
+static mchunkptr direct_resize(mstate m, mchunkptr oldp, size_t nb)
 {
   size_t oldsize = chunksize(oldp);
   if (is_small(nb)) /* Can't shrink direct regions below small size */
@@ -775,7 +515,7 @@ static mchunkptr direct_resize(mchunkptr oldp, size_t nb)
     size_t offset = oldp->prev_foot & ~IS_DIRECT_BIT;
     size_t oldmmsize = oldsize + offset + DIRECT_FOOT_PAD;
     size_t newmmsize = mmap_align(nb + SIX_SIZE_T_SIZES + CHUNK_ALIGN_MASK);
-    char *cp = (char *)CALL_MREMAP((char *)oldp - offset,
+    char *cp = (char *)CALL_MREMAP(m->mi, (char *)oldp - offset,
 				   oldmmsize, newmmsize, CALL_MREMAP_MV);
     if (cp != CMFAIL) {
       mchunkptr newp = (mchunkptr)(cp + offset);
@@ -907,7 +647,7 @@ static void *alloc_sys(mstate m, size_t nb)
 
   /* Directly map large chunks */
   if (LJ_UNLIKELY(nb >= DEFAULT_MMAP_THRESHOLD)) {
-    void *mem = direct_alloc(nb);
+    void *mem = direct_alloc(m, nb);
     if (mem != 0)
       return mem;
   }
@@ -916,7 +656,7 @@ static void *alloc_sys(mstate m, size_t nb)
     size_t req = nb + TOP_FOOT_SIZE + SIZE_T_ONE;
     size_t rsize = granularity_align(req);
     if (LJ_LIKELY(rsize > nb)) { /* Fail if wraps around zero */
-      char *mp = (char *)(CALL_MMAP(rsize));
+      char *mp = (char *)(CALL_MMAP(m->mi, rsize));
       if (mp != CMFAIL) {
 	tbase = mp;
 	tsize = rsize;
@@ -985,7 +725,7 @@ static size_t release_unused_segments(mstate m)
 	} else {
 	  unlink_large_chunk(m, tp);
 	}
-	if (CALL_MUNMAP(base, size) == 0) {
+	if (CALL_MUNMAP(m->mi, base, size) == 0) {
 	  released += size;
 	  /* unlink obsoleted record */
 	  sp = pred;
@@ -1021,8 +761,8 @@ static int alloc_trim(mstate m, size_t pad)
 	  !has_segment_link(m, sp)) { /* can't shrink if pinned */
 	size_t newsize = sp->size - extra;
 	/* Prefer mremap, fall back to munmap */
-	if ((CALL_MREMAP(sp->base, sp->size, newsize, CALL_MREMAP_NOMOVE) != MFAIL) ||
-	    (CALL_MUNMAP(sp->base + newsize, extra) == 0)) {
+	if ((CALL_MREMAP(m->mi, sp->base, sp->size, newsize, CALL_MREMAP_NOMOVE) != MFAIL) ||
+	    (CALL_MUNMAP(m->mi, sp->base + newsize, extra) == 0)) {
 	  released = extra;
 	}
       }
@@ -1147,8 +887,8 @@ void *lj_alloc_create(void)
 {
   size_t tsize = DEFAULT_GRANULARITY;
   char *tbase;
-  INIT_MMAP();
-  tbase = (char *)(CALL_MMAP(tsize));
+  mmap_info mi = INIT_MMAP();
+  tbase = (char *)(CALL_MMAP(mi, tsize));
   if (tbase != CMFAIL) {
     size_t msize = pad_request(sizeof(struct malloc_state));
     mchunkptr mn;
@@ -1159,6 +899,7 @@ void *lj_alloc_create(void)
     m->seg.base = tbase;
     m->seg.size = tsize;
     m->release_checks = MAX_RELEASE_CHECK_RATE;
+    m->mi = mi;
     init_bins(m);
     mn = next_chunk(mem2chunk(m));
     init_top(m, mn, (size_t)((tbase + tsize) - (char *)mn) - TOP_FOOT_SIZE);
@@ -1175,7 +916,7 @@ void lj_alloc_destroy(void *msp)
     char *base = sp->base;
     size_t size = sp->size;
     sp = sp->next;
-    CALL_MUNMAP(base, size);
+    CALL_MUNMAP(ms->mi, base, size);
   }
 }
 
@@ -1274,7 +1015,7 @@ static LJ_NOINLINE void *lj_alloc_free(void *msp, void *ptr)
       if ((prevsize & IS_DIRECT_BIT) != 0) {
 	prevsize &= ~IS_DIRECT_BIT;
 	psize += prevsize + DIRECT_FOOT_PAD;
-	CALL_MUNMAP((char *)p - prevsize, psize);
+	CALL_MUNMAP(fm->mi, (char *)p - prevsize, psize);
 	return NULL;
       } else {
 	mchunkptr prev = chunk_minus_offset(p, prevsize);
@@ -1347,7 +1088,7 @@ static LJ_NOINLINE void *lj_alloc_realloc(void *msp, void *ptr, size_t nsize)
 
     /* Try to either shrink or extend into top. Else malloc-copy-free */
     if (is_direct(oldp)) {
-      newp = direct_resize(oldp, nb);  /* this may return NULL. */
+      newp = direct_resize(m, oldp, nb);  /* this may return NULL. */
     } else if (oldsize >= nb) { /* already big enough */
       size_t rsize = oldsize - nb;
       newp = oldp;
