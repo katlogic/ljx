@@ -43,7 +43,7 @@
 #define LUA_COPYRIGHTS  \
   LUA_VERSION " -- " LUA_COPYRIGHT " -- " LUA_URL "\n" \
   LUAJIT_VERSION " -- " LUAJIT_COPYRIGHT " -- " LUAJIT_URL "\n" \
-  LJX_VERSION " -- " LUA_COPYRIGHT " -- " LJX_URL
+  LJX_VERSION " -- " LJX_COPYRIGHT " -- " LJX_URL
 
 
 /* Modes for luaJIT_setmode. */
