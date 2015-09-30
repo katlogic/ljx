@@ -121,6 +121,11 @@ XCFLAGS=
 # to make life easier.
 # XCFLAGS+= -DLUAJIT_DISABLE_UBKLUDGES
 #
+# Support 4GB memory on Linux AMD64. Note that host process
+# must not be compiled PIE on hardened systems, ie to build luajit REPL, use:
+# $ make TARGET_LDFLAGS=-fno-pie
+XCFLAGS+=-DLUAJIT_ENABLE_4GB
+#
 # Disable the JIT compiler, i.e. turn LuaJIT into a pure interpreter.
 #XCFLAGS+= -DLUAJIT_DISABLE_JIT
 #

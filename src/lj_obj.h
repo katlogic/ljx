@@ -624,10 +624,10 @@ typedef struct GCState {
   uint8_t flags;        /* GCF_* */
   MSize finnum;         /* Number of finalizers to call. */
   MDiff stepmul;	/* Incremental GC step granularity. */
-  MDiff estimate;	/* Estimate of memory actually in use. */
+  MSize estimate;	/* Estimate of memory actually in use. */
   MDiff pause;		/* Pause between successive GC cycles. */
   MSize total;
-  MDiff debt;            /* Bytes allocated not yet compensated by the collector */
+  long  debt;           /* Bytes allocated not yet compensated by the collector. */
 } GCState;
 
 /* Global state, shared by all threads of a Lua universe. */

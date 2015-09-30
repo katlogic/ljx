@@ -525,4 +525,15 @@
 #define	LJ_53			0
 #endif
 
+/* Enable 4GB memory model */
+#ifdef LUAJIT_ENABLE_4GB
+#include <malloc.h>
+#if !(LJ_64 && !LJ_GC64 && defined(M_MMAP_THRESHOLD))
+#error "4GB memory model not supported (need X64, mallopt() and !GC64)"
+#endif
+#define LJ_4GB                  1
+#else
+#define LJ_4GB                  0
+#endif
+
 #endif

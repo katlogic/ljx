@@ -65,6 +65,9 @@
  ((((size_t)(A) & CHUNK_ALIGN_MASK) == 0)? 0 :\
   ((MALLOC_ALIGNMENT - ((size_t)(A) & CHUNK_ALIGN_MASK)) & CHUNK_ALIGN_MASK))
 
+#define any_align(S,n) \
+ (((S) + ((n) - SIZE_T_ONE)) & ~((n) - SIZE_T_ONE))
+
 /* -------------------------- MMAP support ------------------------------- */
 
 #define MFAIL			((void *)(MAX_SIZE_T))
@@ -162,6 +165,23 @@ static LJ_AINLINE int CALL_MUNMAP(void *ptr, size_t size)
   SetLastError(olderr);
   return 0;
 }
+
+/*
+ * If the libc supports it, try to convince it to always use brk()
+ * even for large allocations.
+ */
+#elif LJ_4GB
+#define INIT_MMAP() { \
+  mallopt(M_MMAP_THRESHOLD, LJ_MAX_MEM); \
+  mallopt(M_MMAP_MAX, 0); \
+}
+#define CALL_MMAP(n) aligned_alloc(LJ_PAGESIZE, n)
+#define CALL_MUNMAP_FORCE(n,s) ((void)s,free(n),0)
+#define CALL_MUNMAP(n,s) ((void)(s),(void)(n),-1)
+#define CALL_MREMAP(addr, osz, nsz, mv) ((void)osz,realloc((addr), (nsz)))
+#define DIRECT_MMAP CALL_MMAP
+#undef MFAIL
+#define MFAIL NULL
 
 #else
 
@@ -271,7 +291,9 @@ static LJ_AINLINE void *CALL_MMAP(size_t size)
 
 #endif
 
+#ifndef INIT_MMAP
 #define INIT_MMAP()		((void)0)
+#endif
 #define DIRECT_MMAP(s)		CALL_MMAP(s)
 
 static LJ_AINLINE int CALL_MUNMAP(void *ptr, size_t size)
@@ -307,6 +329,10 @@ static LJ_AINLINE void *CALL_MREMAP_(void *ptr, size_t osz, size_t nsz,
 
 #ifndef CALL_MREMAP
 #define CALL_MREMAP(addr, osz, nsz, mv) ((void)osz, MFAIL)
+#endif
+
+#ifndef CALL_MUNMAP_FORCE
+#define CALL_MUNMAP_FORCE CALL_MUNMAP
 #endif
 
 /* -----------------------  Chunk representations ------------------------ */
@@ -470,18 +496,17 @@ typedef struct malloc_state *mstate;
 /* -------------------------- system alloc setup ------------------------- */
 
 /* page-align a size */
-#define page_align(S)\
- (((S) + (LJ_PAGESIZE - SIZE_T_ONE)) & ~(LJ_PAGESIZE - SIZE_T_ONE))
+#define page_align(S) any_align(S,LJ_PAGESIZE)
 
 /* granularity-align a size */
-#define granularity_align(S)\
-  (((S) + (DEFAULT_GRANULARITY - SIZE_T_ONE))\
-   & ~(DEFAULT_GRANULARITY - SIZE_T_ONE))
+#define granularity_align(S) any_align(S,DEFAULT_GRANULARITY)
 
+#ifndef mmap_align
 #if LJ_TARGET_WINDOWS
 #define mmap_align(S)	granularity_align(S)
 #else
 #define mmap_align(S)	page_align(S)
+#endif
 #endif
 
 /*  True if segment S holds address A */
@@ -1175,7 +1200,7 @@ void lj_alloc_destroy(void *msp)
     char *base = sp->base;
     size_t size = sp->size;
     sp = sp->next;
-    CALL_MUNMAP(base, size);
+    CALL_MUNMAP_FORCE(base, size);
   }
 }
 
@@ -1274,7 +1299,7 @@ static LJ_NOINLINE void *lj_alloc_free(void *msp, void *ptr)
       if ((prevsize & IS_DIRECT_BIT) != 0) {
 	prevsize &= ~IS_DIRECT_BIT;
 	psize += prevsize + DIRECT_FOOT_PAD;
-	CALL_MUNMAP((char *)p - prevsize, psize);
+	CALL_MUNMAP_FORCE((char *)p - prevsize, psize);
 	return NULL;
       } else {
 	mchunkptr prev = chunk_minus_offset(p, prevsize);

@@ -6,6 +6,10 @@
 #define lj_mcode_c
 #define LUA_CORE
 
+#if defined(__linux__) && !defined(_GNU_SOURCE)
+#define _GNU_SOURCE
+#endif
+
 #include "lj_obj.h"
 #if LJ_HASJIT
 #include "lj_gc.h"
@@ -86,7 +90,7 @@ static int mcode_setprot(void *p, size_t sz, DWORD prot)
 }
 
 #elif LJ_TARGET_POSIX
-
+#include <stdlib.h>
 #include <sys/mman.h>
 
 #ifndef MAP_ANONYMOUS
@@ -97,6 +101,7 @@ static int mcode_setprot(void *p, size_t sz, DWORD prot)
 #define MCPROT_RX	(PROT_READ|PROT_EXEC)
 #define MCPROT_RWX	(PROT_READ|PROT_WRITE|PROT_EXEC)
 
+#if !LJ_4GB
 static void *mcode_alloc_at(jit_State *J, uintptr_t hint, size_t sz, int prot)
 {
   void *p = mmap((void *)hint, sz, prot, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
@@ -106,11 +111,18 @@ static void *mcode_alloc_at(jit_State *J, uintptr_t hint, size_t sz, int prot)
   }
   return p;
 }
+#endif
 
 static void mcode_free(jit_State *J, void *p, size_t sz)
 {
   UNUSED(J);
+#if LJ_4GB
+  /* Coalesce the area back to sbrk() VMA */
+  mprotect(p, sz, MCPROT_RW);
+  free(p);
+#else
   munmap(p, sz);
+#endif
 }
 
 static int mcode_setprot(void *p, size_t sz, int prot)
@@ -227,6 +239,12 @@ static void *mcode_alloc(jit_State *J, size_t sz)
   uintptr_t target = (uintptr_t)(void *)lj_vm_exit_handler & ~(uintptr_t)0xffff;
 #endif
   const uintptr_t range = (1u << (LJ_TARGET_JUMPRANGE-1)) - (1u << 21);
+#if LJ_4GB
+  void *p = aligned_alloc(LJ_PAGESIZE, sz);
+  if (mcode_validptr(p) &&
+    ((uintptr_t)p + sz - target < range || target - (uintptr_t)p < range))
+      return p;
+#else
   /* First try a contiguous area below the last one. */
   uintptr_t hint = J->mcarea ? (uintptr_t)J->mcarea - sz : 0;
   int i;
@@ -245,6 +263,7 @@ static void *mcode_alloc(jit_State *J, size_t sz)
     } while (!(hint + sz < range));
     hint = target + hint - (range>>1);
   }
+#endif
   lj_trace_err(J, LJ_TRERR_MCODEAL);  /* Give up. OS probably ignores hints? */
   return NULL;
 }

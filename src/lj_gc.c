@@ -778,15 +778,15 @@ void lj_gc_checkfinalizer(lua_State *L, GCobj *o)
 /* -- Collector ----------------------------------------------------------- */
 
 /* Adjust how much memory is owed. */
-void lj_gc_setdebt(global_State *g, MDiff debt)
+void lj_gc_setdebt(global_State *g, long debt)
 {
   g->gc.total -= (debt - g->gc.debt);
   g->gc.debt = debt;
 }
 
 /* Estimate pause to wait between gc cycles. */
-static void gc_setpause(global_State *g, MDiff estimate) {
-  MDiff threshold, debt;
+static void gc_setpause(global_State *g, long estimate) {
+  long threshold, debt;
   estimate = estimate / PAUSEADJ;  /* adjust 'estimate' */
   if (!estimate) estimate++;
   threshold = (g->gc.pause < LJ_MAX_MEM / estimate)  /* overflow? */
@@ -1058,10 +1058,9 @@ void *lj_mem_realloc(lua_State *L, void *p, GCSize osz, GCSize nsz)
   global_State *g = G(L);
   lua_assert((osz == 0) == (p == NULL));
   p = g->allocf(g->allocd, p, osz, nsz);
-  if (p == NULL && nsz > 0)
+  if (((p == NULL) || (!checkptr32(p))) && nsz > 0)
     lj_err_mem(L);
   lua_assert((nsz == 0) == (p == NULL));
-  lua_assert(checkptr32(p));
   /* Clamp debt. TBD: faster. */
   if (resize >= 0) {
     if ((MDiff)(g->gc.debt + resize) < g->gc.debt)
