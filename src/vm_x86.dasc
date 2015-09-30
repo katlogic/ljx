@@ -1377,8 +1377,9 @@ static void build_subroutines(BuildCtx *ctx)
   |
   |// Inlined GC threshold check. Caveat: uses label 1.
   |.macro ffgccheck
-  |  cmp dword [DISPATCH+DISPATCH_GL(gc.debt)], 0
-  |  jbe >1
+  |  mov RB, [DISPATCH+DISPATCH_GL(gc.total)]
+  |  cmp RB, [DISPATCH+DISPATCH_GL(gc.threshold)]
+  |  jb >1
   |  call ->fff_gcstep
   |1:
   |.endmacro
@@ -4082,9 +4083,10 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  ins_AD	// RA = dst, RD = hbits|asize
     |  mov L:RB, SAVE_L
     |  mov L:RB->base, BASE
-    |  cmp dword[DISPATCH+DISPATCH_GL(gc.debt)], 0
+    |  mov RA, [DISPATCH+DISPATCH_GL(gc.total)]
+    |  cmp RA, [DISPATCH+DISPATCH_GL(gc.threshold)]
     |  mov SAVE_PC, PC
-    |  ja >5
+    |  jae >5
     |1:
     |.if X64
     |  mov CARG3d, RD
@@ -4125,10 +4127,11 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
   case BC_TDUP:
     |  ins_AND	// RA = dst, RD = table const (~) (holding template table)
     |  mov L:RB, SAVE_L
+    |  mov RA, [DISPATCH+DISPATCH_GL(gc.total)]
     |  mov SAVE_PC, PC
-    |  cmp dword [DISPATCH+DISPATCH_GL(gc.debt)], 0
+    |  cmp RA, [DISPATCH+DISPATCH_GL(gc.threshold)]
     |  mov L:RB->base, BASE
-    |  ja >3
+    |  jae >3
     |2:
     |  mov TAB:FCARG2, [KBASE+RD*4]	// Caveat: FCARG2 == BASE
     |  mov L:FCARG1, L:RB		// Caveat: FCARG1 == RA

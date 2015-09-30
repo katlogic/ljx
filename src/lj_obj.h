@@ -605,29 +605,23 @@ typedef enum {
 #define mmname_str(g, mm)	(strref((g)->gcroot[GCROOT_MMNAME+(mm)]))
 
 typedef struct GCState {
-  MRef sweep;		/* Sweep position in root list. */
-  GCRef root;		/* List of all collectable objects. */
-  GCRef finobj;         /* List of collectable objects with finalizers */
-  GCRef gray;		/* List of gray objects. */
-
-  GCRef grayagain;	/* List of objects for atomic traversal. */
-  GCRef weak;		/* List of weak values (to be cleared). */
-  GCRef ephemeron;      /* Weak keys */
-  GCRef allweak;        /* Both keys and values weak */
-
-  GCRef tobefnz;        /* Sweep position in finalized. g->gcnext is head. */
-  MSize memtrav;        /* memory traversed by the GC */
-  MSize sweepstr;	/* Sweep position in string table. */
+  GCSize total;		/* Memory currently allocated. */
+  GCSize threshold;	/* Memory threshold. */
   uint8_t currentwhite;	/* Current white color. */
-  uint8_t state;	/* GC state machine. */
+  uint8_t state;	/* GC state. */
   uint8_t nocdatafin;	/* No cdata finalizer called. */
-  uint8_t flags;        /* GCF_* */
-  MSize finnum;         /* Number of finalizers to call. */
-  MDiff stepmul;	/* Incremental GC step granularity. */
-  MSize estimate;	/* Estimate of memory actually in use. */
-  MDiff pause;		/* Pause between successive GC cycles. */
-  MSize total;
-  long  debt;           /* Bytes allocated not yet compensated by the collector. */
+  uint8_t unused2;
+  MSize sweepstr;	/* Sweep position in string table. */
+  GCRef root;		/* List of all collectable objects. */
+  MRef sweep;		/* Sweep position in root list. */
+  GCRef gray;		/* List of gray objects. */
+  GCRef grayagain;	/* List of objects for atomic traversal. */
+  GCRef weak;		/* List of weak tables (to be cleared). */
+  GCRef mmudata;	/* List of userdata (to be finalized). */
+  GCSize debt;		/* Debt (how much GC is behind schedule). */
+  GCSize estimate;	/* Estimate of memory actually in use. */
+  MSize stepmul;	/* Incremental GC step granularity. */
+  MSize pause;		/* Pause between successive GC cycles. */
 } GCState;
 
 /* Global state, shared by all threads of a Lua universe. */

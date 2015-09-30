@@ -146,12 +146,9 @@ static TValue *cpluaopen(lua_State *L, lua_CFunction dummy, void *ud)
   UNUSED(dummy);
   UNUSED(ud);
   stack_init(L, L);
-
   lua_assert(L->cframe);
-  /* TBD: XARCH - assume stack grows down for now */
   g->cframe_limit = L->cframe - LUAI_MAXCFRAME;
-
-  /* Init strings and lexer. */
+  /* NOBARRIER: State initialization, all objects are white. */
   lj_str_resize(L, LJ_MIN_STRTAB-1);
   lj_meta_init(L);
   lj_lex_init(L);
@@ -181,6 +178,7 @@ static TValue *cpluaopen(lua_State *L, lua_CFunction dummy, void *ud)
   setthreadV(L, lj_tab_setint(L, reg, LUA_RIDX_MAINTHREAD), L);
 
   g->version = lua_version(NULL);
+  g->gc.threshold = 4*g->gc.total;
   lj_trace_initstate(g);
   return NULL;
 }
@@ -189,7 +187,7 @@ static void close_state(lua_State *L)
 {
   global_State *g = G(L);
   lj_func_closeuv(L, tvref(L->stack));
-  lj_gc_freeall(L);
+  lj_gc_freeall(g);
   lua_assert(gcref(g->gc.root) == obj2gco(L));
   lua_assert(g->strnum == 0);
   lj_trace_freestate(g);
@@ -199,7 +197,7 @@ static void close_state(lua_State *L)
   lj_mem_freevec(g, g->strhash, g->strmask+1, GCRef);
   lj_buf_free(g, &g->tmpbuf);
   lj_mem_freevec(g, tvref(L->stack), L->stacksize, TValue);
-  lua_assert(gc_gettotalbytes(g) == sizeof(GG_State));
+  lua_assert(g->gc.total == sizeof(GG_State));
 #ifndef LUAJIT_USE_SYSMALLOC
   if (g->allocf == lj_alloc_f)
     lj_alloc_destroy(g->allocd);
@@ -241,10 +239,8 @@ LUA_API lua_State *lua_newstate(lua_Alloc f, void *ud)
   lj_buf_init(NULL, &g->tmpbuf);
   g->gc.state = GCSpause;
   setgcref(g->gc.root, obj2gco(L));
-  setmref(g->gc.sweep, NULL);
+  setmref(g->gc.sweep, &g->gc.root);
   g->gc.total = sizeof(GG_State);
-  g->gc.debt = 0;
-  g->gc.flags = GCF_stayontrace;
   g->gc.pause = LUAI_GCPAUSE;
   g->gc.stepmul = LUAI_GCMUL;
   lj_dispatch_init((GG_State *)L);
@@ -258,19 +254,44 @@ LUA_API lua_State *lua_newstate(lua_Alloc f, void *ud)
   return L;
 }
 
+static TValue *cpfinalize(lua_State *L, lua_CFunction dummy, void *ud)
+{
+  UNUSED(dummy);
+  UNUSED(ud);
+  lj_gc_finalize_cdata(L);
+  lj_gc_finalize_udata(L);
+  /* Frame pop omitted. */
+  return NULL;
+}
+
 LUA_API void lua_close(lua_State *L)
 {
   global_State *g = G(L);
+  int i;
   L = mainthread(g);  /* Only the main thread can be closed. */
 #if LJ_HASPROFILE
   luaJIT_profile_stop(L);
 #endif
   setgcrefnull(g->cur_L);
+  lj_func_closeuv(L, tvref(L->stack));
+  lj_gc_separateudata(g, 1);  /* Separate udata which have GC metamethods. */
 #if LJ_HASJIT
   G2J(g)->flags &= ~JIT_F_ON;
   G2J(g)->state = LJ_TRACE_IDLE;
   lj_dispatch_update(g);
 #endif
+  for (i = 0;;) {
+    hook_enter(g);
+    L->status = 0;
+    L->base = L->top = tvref(L->stack) + 1 + LJ_FR2;
+    L->cframe = NULL;
+    if (lj_vm_cpcall(L, NULL, NULL, cpfinalize) == 0) {
+      if (++i >= 10) break;
+      lj_gc_separateudata(g, 1);  /* Separate udata again. */
+      if (gcref(g->gc.mmudata) == NULL)  /* Until nothing is left to do. */
+	break;
+    }
+  }
   close_state(L);
 }
 

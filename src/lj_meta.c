@@ -299,7 +299,7 @@ TValue *lj_meta_cat(lua_State *L, TValue *top, int left)
       setstrV(L, top, lj_str_new(L, buf, (size_t)(p-buf)));
     }
   } while (left >= 1);
-  if (LJ_UNLIKELY(G(L)->gc.debt)) {
+  if (LJ_UNLIKELY(G(L)->gc.total >= G(L)->gc.threshold)) {
     if (!fromc) L->top = curr_topL(L);
     lj_gc_step(L);
   }

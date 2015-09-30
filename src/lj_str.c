@@ -107,7 +107,7 @@ void lj_str_resize(lua_State *L, MSize newmask)
   global_State *g = G(L);
   GCRef *newhash;
   MSize i;
-  if (g->gc.state == GCSswpstr || newmask >= LJ_MAX_STRTAB-1)
+  if (g->gc.state == GCSsweepstring || newmask >= LJ_MAX_STRTAB-1)
     return;  /* No resizing during GC traversal or if already too big. */
   newhash = lj_mem_newvec(L, newmask+1, GCRef);
   memset(newhash, 0, (newmask+1)*sizeof(GCRef));

@@ -2415,14 +2415,10 @@ static void asm_gc_check(ASMState *as)
   tmp = ra_releasetmp(as, ASMREF_TMP1);
   emit_loada(as, tmp, J2G(as->J));
   emit_loadi(as, ra_releasetmp(as, ASMREF_TMP2), as->gcsteps);
-  /* jle skip_gc_step_jit */
-  emit_sjcc(as, CC_LE, l_end);
-  /* cmp [dword &J2G(as->J)->gc.debt], byte 0 */
-  as->mrm.ofs = ptr2addr(&J2G(as->J)->gc.debt);
-  as->mrm.base = as->mrm.idx = RID_NONE;
-  as->mrm.scale = XM_SCALE1;
-  emit_i8(as, 0);
-  emit_mrm(as, XO_ARITHi8, XOg_CMP, RID_MRM);
+  /* Jump around GC step if GC total < GC threshold. */
+  emit_sjcc(as, CC_B, l_end);
+  emit_opgl(as, XO_ARITH(XOg_CMP), tmp, gc.threshold);
+  emit_getgl(as, tmp, gc.total);
   as->gcsteps = 0;
   checkmclim(as);
 }
