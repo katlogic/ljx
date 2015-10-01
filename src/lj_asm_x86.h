@@ -2404,7 +2404,6 @@ static void asm_gc_check(ASMState *as)
   MCLabel l_end;
   Reg tmp;
   ra_evictset(as, RSET_SCRATCH);
-  /* skip_gc_step_jit: */
   l_end = emit_label(as);
   /* Exit trace if in GCSatomic or GCSfinalize. Avoids syncing GC objects. */
   asm_guardcc(as, CC_NE);  /* Assumes asm_snap_prep() already done. */

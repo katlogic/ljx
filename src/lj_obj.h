@@ -17,7 +17,7 @@
 
 /* Memory and GC object sizes. */
 typedef uint32_t MSize;
-#if LJ_GC64
+#if LJ_64
 typedef uint64_t GCSize;
 #else
 typedef uint32_t GCSize;
