@@ -441,8 +441,8 @@ static int push_captures(MatchState *ms, const char *s, const char *e)
   return nlevels;  /* number of strings pushed */
 }
 
-/* Perform match and store result in global state for FFI mcode to pick up. */
-MatchState * ljx_str_match(lua_State *L, const char *s, const char *p, MSize slen, MSize plen, int32_t start)
+MatchState * ljx_str_match(lua_State *L, const char *s, const char *p,
+		MSize slen, MSize plen, int32_t start)
 {
   MatchState *ms = &G(L)->ms;
   int anchor = 0;
@@ -472,6 +472,7 @@ MatchState * ljx_str_match(lua_State *L, const char *s, const char *p, MSize sle
       if (!ms->level) {
         setmref(ms->capture[0].init, sstr);
         ms->capture[0].len = q - sstr;
+	ms->level = 1;
       }
       return ms;
     }
@@ -533,12 +534,12 @@ static int str_find_aux(lua_State *L, int find)
   return 1;
 }
 
-LJLIB_CF(string_find)		LJLIB_REC(.)
+LJLIB_CF(string_find) 	LJLIB_REC(.)
 {
   return str_find_aux(L, 1);
 }
 
-LJLIB_CF(string_match)          LJLIB_REC(.)
+LJLIB_CF(string_match) 	LJLIB_REC(.)
 {
   return str_find_aux(L, 0);
 }
