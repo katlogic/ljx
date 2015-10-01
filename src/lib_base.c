@@ -459,7 +459,7 @@ LJLIB_CF(collectgarbage)
     return 2;
   } else {
     int res = lua_gc(L, opt, data);
-    if ((opt == LUA_GCSTEP) || (opt == LUA_GCISRUNNING))
+    if (opt == LUA_GCSTEP || opt == LUA_GCISRUNNING)
       setboolV(L->top, res);
     else
       setintV(L->top, res);
