@@ -673,7 +673,7 @@ static size_t gc_onestep(lua_State *L)
 int LJ_FASTCALL lj_gc_step(lua_State *L)
 {
   global_State *g = G(L);
-  GCSize lim;
+  int64_t lim;
   int32_t ostate = g->vmstate;
   setvmstate(g, GC);
   lim = (GCSTEPSIZE/100) * g->gc.stepmul;
@@ -684,11 +684,14 @@ int LJ_FASTCALL lj_gc_step(lua_State *L)
   do {
     lim -= (GCSize)gc_onestep(L);
     if (g->gc.state == GCSpause) {
-      g->gc.threshold = (g->gc.estimate/100) * g->gc.pause;
+      int64_t nt = (g->gc.estimate/100) * g->gc.pause;
+      if (nt > LJ_MAX_MEM)
+        nt = LJ_MAX_MEM;
+      g->gc.threshold = nt;
       g->vmstate = ostate;
       return 1;  /* Finished a GC cycle. */
     }
-  } while (sizeof(lim) == 8 ? ((int64_t)lim > 0) : ((int32_t)lim > 0));
+  } while (lim > 0);
   if (g->gc.debt < GCSTEPSIZE) {
     g->gc.threshold = g->gc.total + GCSTEPSIZE;
     g->vmstate = ostate;
@@ -812,10 +815,9 @@ void *lj_mem_realloc(lua_State *L, void *p, GCSize osz, GCSize nsz)
   global_State *g = G(L);
   lua_assert((osz == 0) == (p == NULL));
   p = g->allocf(g->allocd, p, osz, nsz);
-  if (p == NULL && nsz > 0)
+  if (nsz > 0 && (!p || !checkptrGC(p)))
     lj_err_mem(L);
   lua_assert((nsz == 0) == (p == NULL));
-  lua_assert(checkptrGC(p));
   g->gc.total = (g->gc.total - osz) + nsz;
   return p;
 }

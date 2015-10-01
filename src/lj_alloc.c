@@ -37,9 +37,14 @@
 #define MAX_SIZE_T		(~(size_t)0)
 #define MALLOC_ALIGNMENT	((size_t)8U)
 
-#define DEFAULT_GRANULARITY	((size_t)128U * (size_t)1024U)
-#define DEFAULT_TRIM_THRESHOLD	((size_t)2U * (size_t)1024U * (size_t)1024U)
-#define DEFAULT_MMAP_THRESHOLD	((size_t)128U * (size_t)1024U)
+#if LJ_4GB
+#define MEM_SCALE 16
+#else
+#define MEM_SCALE 1
+#endif
+#define DEFAULT_GRANULARITY	((size_t)128U * MEM_SCALE * (size_t)1024U)
+#define DEFAULT_TRIM_THRESHOLD	((size_t)2U * MEM_SCALE * (size_t)1024U * (size_t)1024U)
+#define DEFAULT_MMAP_THRESHOLD	((size_t)128U * MEM_SCALE * (size_t)1024U)
 #define MAX_RELEASE_CHECK_RATE	255
 
 /* ------------------- size_t and alignment properties -------------------- */
