@@ -375,7 +375,13 @@ static void print_version(lua_State *L, int jit)
 #ifndef LUAJIT_PRETEND_RIO
   fputs(LJX_VERSION ", type _COPYRIGHTS, _CREDITS, _VERSION for more info.\n", stdout);
   fputs("ABI: " LUA_VERSION_MAJOR "." LUA_VERSION_MINOR
-        " on " LJ_OS_NAME "/" LJ_ARCH_NAME, stdout);
+        " on " LJ_OS_NAME "/" LJ_ARCH_NAME
+#if LJ_4GB
+	"/4GB heap"
+#elif LJ_GC64
+	"/GC64"
+#endif
+	, stdout);
 #ifdef __DATE__
   fputs(", built " __DATE__, stdout);
 #endif
