@@ -522,15 +522,15 @@ LJLIB_CF(ffi_new)	LJLIB_REC(.)
 	/* Add to finalizer table, if still enabled. */
 	copyTV(L, lj_tab_set(L, t, o-1), tv);
 	lj_gc_anybarriert(L, t);
-        lj_gc_checkfinalizer(L, gcval(o));
+        //lj_gc_checkfinalizer(L, gcval(o));
       }
     }
 #else
     /* LJX 5.2 semantics: just put it on finalizer list.
      * Because types are never collected, gc_finalize will
      * resolve finalizer from miscmap in gc_finalize(). */
-    if (tv && tvistab(tv) && lj_meta_fast(L, tabV(tv), MM_gc))
-        lj_gc_checkfinalizer(L, gcval(o));
+    //if (tv && tvistab(tv) && lj_meta_fast(L, tabV(tv), MM_gc))
+        //lj_gc_checkfinalizer(L, gcval(o));
 #endif
   }
   L->top = o;  /* Only return the cdata itself. */

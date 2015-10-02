@@ -12,7 +12,7 @@
 
 GCudata *lj_udata_new(lua_State *L, MSize sz, GCtab *env)
 {
-  GCudata *ud = lj_mem_newgco(L, sizeof(GCudata) + sz);
+  GCudata *ud = lj_mem_newt(L, sizeof(GCudata) + sz, GCudata);
   global_State *g = G(L);
   newwhite(g, ud);  /* Not finalized. */
   ud->gct = ~LJ_TUDATA;
@@ -27,6 +27,9 @@ GCudata *lj_udata_new(lua_State *L, MSize sz, GCtab *env)
     setgcrefnull(ud->env);
     ud->envtt = ~LJ_TNIL;
   }
+  /* Chain to userdata list (after main thread). */
+  setgcrefr(ud->nextgc, mainthread(g)->nextgc);
+  setgcref(mainthread(g)->nextgc, obj2gco(ud));
   return ud;
 }
 

@@ -23,6 +23,8 @@ enum {
 #define LJ_GC_CDATA_FIN	0x10
 #define LJ_GC_FIXED	0x20
 #define LJ_GC_SFIXED	0x40
+#define LJ_GC_CDATAV    0x80
+#define LJ_GC_TOFINALIZE 0x80
 
 #define LJ_GC_WHITES	(LJ_GC_WHITE0 | LJ_GC_WHITE1)
 #define LJ_GC_COLORS	(LJ_GC_WHITES | LJ_GC_BLACK)
@@ -44,11 +46,14 @@ enum {
 #define black2gray(x)	((x)->gch.marked &= (uint8_t)~LJ_GC_BLACK)
 #define fixstring(s)	((s)->marked |= LJ_GC_FIXED)
 #define markfinalized(x)	((x)->gch.marked |= LJ_GC_FINALIZED)
+#define clearfinalized(x)	((x)->gch.marked &= ~LJ_GC_FINALIZED)
+#define marktofinalize(x) 	((x)->gch.marked |= LJ_GC_TOFINALIZE)
+#define cleartofinalize(x)	((x)->gch.marked &= ~LJ_GC_TOFINALIZE)
 
 /* Collector. */
 LJ_FUNC size_t lj_gc_separateudata(global_State *g, int all);
 LJ_FUNC void lj_gc_finalize_udata(lua_State *L);
-LJ_FUNC void lj_gc_checkfinalizer(lua_State *L, GCobj *o);
+LJ_FUNC void lj_gc_tab_finalized(lua_State *L, GCobj *o);
 #if LJ_HASFFI
 LJ_FUNC void lj_gc_finalize_cdata(lua_State *L);
 #else

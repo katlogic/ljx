@@ -44,7 +44,7 @@ GCcdata *lj_cdata_newv(lua_State *L, CTypeID id, CTSize sz, CTSize align)
   setgcrefr(cd->nextgc, g->gc.root);
   setgcref(g->gc.root, obj2gco(cd));
   newwhite(g, obj2gco(cd));
-  cd->marked |= 0x80;
+  cd->marked |= LJ_GC_CDATAV;
   cd->gct = ~LJ_TCDATA;
   cd->ctypeid = id;
   return cd;
@@ -74,7 +74,7 @@ void lj_cdata_setfin(lua_State *L, GCcdata *cd, GCobj *obj, uint32_t it)
     lj_gc_anybarriert(L, t);
     tv = lj_tab_set(L, t, &tmp);
     setgcV(L, tv, obj, it);
-    lj_gc_checkfinalizer(L, obj);
+    //lj_gc_checkfinalizer(L, obj);
   }
 }
 
