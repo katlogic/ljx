@@ -514,24 +514,16 @@ LJLIB_CF(ffi_new)	LJLIB_REC(.)
 		   o, (MSize)(L->top - o));  /* Initialize cdata. */
   if (ctype_isstruct(ct->info)) {
     cTValue *tv = lj_tab_getinth(cts->miscmap, -(int32_t)id);
-#if LJ_51
     /* Handle ctype __gc metamethod. Use the fast lookup here. */
     if (tv && tvistab(tv) && (tv = lj_meta_fast(L, tabV(tv), MM_gc))) {
       GCtab *t = cts->finalizer;
       if (gcref(t->metatable)) {
 	/* Add to finalizer table, if still enabled. */
 	copyTV(L, lj_tab_set(L, t, o-1), tv);
+	cd->marked |= LJ_GC_FINALIZED;
 	lj_gc_anybarriert(L, t);
-        //lj_gc_checkfinalizer(L, gcval(o));
       }
     }
-#else
-    /* LJX 5.2 semantics: just put it on finalizer list.
-     * Because types are never collected, gc_finalize will
-     * resolve finalizer from miscmap in gc_finalize(). */
-    //if (tv && tvistab(tv) && lj_meta_fast(L, tabV(tv), MM_gc))
-        //lj_gc_checkfinalizer(L, gcval(o));
-#endif
   }
   L->top = o;  /* Only return the cdata itself. */
   lj_gc_check(L);

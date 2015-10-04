@@ -36,7 +36,6 @@
 #define white2gray(x)		((x)->gch.marked &= (uint8_t)~LJ_GC_WHITES)
 #define gray2black(x)		((x)->gch.marked |= LJ_GC_BLACK)
 #define isfinalized(u)		((u)->marked & LJ_GC_FINALIZED)
-#define tofinalize(u)		(((u)->gch.gct == ~LJ_TTAB) && ((u)->gch.marked & LJ_GC_TOFINALIZE))
 
 /* -- Mark phase ---------------------------------------------------------- */
 
@@ -73,8 +72,9 @@ static void gc_mark(global_State *g, GCobj *o)
   } else if (gct != ~LJ_TSTR && gct != ~LJ_TCDATA) {
     lua_assert(gct == ~LJ_TFUNC || gct == ~LJ_TTAB ||
 	       gct == ~LJ_TTHREAD || gct == ~LJ_TPROTO || gct == ~LJ_TTRACE);
-    if (tofinalize(o)) {
-      gray2black(o);
+    if (gct == ~LJ_TTAB && isfinalized(gco2tab(o))) {
+      /* UNSURE: Always stays gray if __gc. */
+//      gray2black(o);
       gc_traverse_tab(g, gco2tab(o));
     } else {
       setgcrefr(o->gch.gclist, g->gc.gray);
@@ -116,7 +116,7 @@ static void gc_mark_uv(global_State *g)
   }
 }
 
-/* Mark userdata in mmudata list. */
+/* Mark userdata and tables in mmudata list. */
 static void gc_mark_mmudata(global_State *g)
 {
   GCobj *root = gcref(g->gc.mmudata);
@@ -137,16 +137,16 @@ size_t lj_gc_separateudata(global_State *g, int all)
   GCRef *p = &mainthread(g)->nextgc;
   GCobj *o;
   while ((o = gcref(*p)) != NULL) {
-    int gct = o->gch.gct;
-    if (!(iswhite(o) || all) || isfinalized(&(o->gch))) {
+    int isud = o->gch.gct == ~LJ_TUDATA;
+    lua_assert(isud || o->gch.gct == ~LJ_TTAB);
+    if (!(iswhite(o) || all) || (isud && isfinalized(&(o->gch)))) {
       p = &o->gch.nextgc;  /* Nothing to do. */
-    } else if (!lj_meta_fastg(g, tabref(o->ud.metatable), MM_gc)) {
+    } else if (isud && !lj_meta_fastg(g, tabref(o->ud.metatable), MM_gc)) {
       markfinalized(o);  /* Done, as there's no __gc metamethod. */
       p = &o->gch.nextgc;
-    } else {  /* Otherwise move userdata to be finalized to mmudata list. */
-      if (gct != ~LJ_TTAB) {
+    } else {  /* Otherwise move it to mmudata list. */
+      if (isud)
         m += sizeudata(gco2ud(o));
-      }
       *p = o->gch.nextgc; /* Advance */
       if (gcref(g->gc.mmudata)) {  /* Link to end of mmudata list. */
 	GCobj *root = gcref(g->gc.mmudata);
@@ -170,11 +170,11 @@ static int gc_traverse_tab(global_State *g, GCtab *t)
   int weak = 0;
   cTValue *mode;
   GCtab *mt = tabref(t->metatable);
+  int tofin = isfinalized(t);
   if (mt)
     gc_markobj(g, mt);
-  
-  if ((mode = lj_meta_fastg(g, mt, MM_mode))
-    && tvisstr(mode)) {  /* Valid __mode field? */
+  mode = lj_meta_fastg(g, mt, MM_mode);
+  if (mode && tvisstr(mode)) {  /* Valid __mode field? */
     const char *modestr = strVdata(mode);
     int c;
     while ((c = *modestr++)) {
@@ -184,7 +184,7 @@ static int gc_traverse_tab(global_State *g, GCtab *t)
     }
     if (weak > 0) {  /* Weak tables are cleared in the atomic phase. */
       t->marked = (uint8_t)((t->marked & ~LJ_GC_WEAK) | weak);
-      if (!tofinalize(obj2gco(t))) { /* Wait until it is finalized. */
+      if (!tofin) { /* UNSURE: Wait until it is finalized. */
         setgcrefr(t->gclist, g->gc.weak);
         setgcref(g->gc.weak, obj2gco(t));
       }
@@ -209,7 +209,7 @@ static int gc_traverse_tab(global_State *g, GCtab *t)
       }
     }
   }
-  return weak && !tofinalize(obj2gco(t));
+  return weak || tofin; /* UNSURE: Keep gray if __gc */
 }
 
 /* Traverse a function. */
@@ -503,7 +503,7 @@ static void gc_finalize(lua_State *L)
     setgcrefr(o->gch.nextgc, g->gc.root);
     setgcref(g->gc.root, o);
     makewhite(g, o);
-    o->gch.marked &= (uint8_t)~LJ_GC_CDATA_FIN;
+    o->gch.marked &= (uint8_t)~LJ_GC_FINALIZED;
     /* Resolve finalizer. */
     setcdataV(L, &tmp, gco2cd(o));
     tv = lj_tab_set(L, ctype_ctsG(g)->finalizer, &tmp);
@@ -520,14 +520,14 @@ static void gc_finalize(lua_State *L)
     /* Add table back to the main userdata list and make it white. */
     setgcrefr(o->gch.nextgc, g->gc.root);
     setgcref(g->gc.root, o);
-    cleartofinalize(o);
+    clearfinalized(o); /* This stops it from being finalized again.  */
   } else {
     /* Add userdata back to the main userdata list and make it white. */
     setgcrefr(o->gch.nextgc, mainthread(g)->nextgc);
     setgcref(mainthread(g)->nextgc, o);
+    markfinalized(o); /* This stops it from being finalized again.  */
   }
   makewhite(g, o);
-  markfinalized(o); /* This stops it from being finalized again.  */
   /* Resolve the __gc metamethod. */
   mo = lj_meta_fastg(g, tabref(o->ud.metatable), MM_gc);
   if (mo)
@@ -541,34 +541,42 @@ void lj_gc_finalize_udata(lua_State *L)
     gc_finalize(L);
 }
 
+void lj_gc_checkfinalizer(lua_State *L, GCobj *o)
+{
+  /* TBD */
+}
+
 void lj_gc_tab_finalized(lua_State *L, GCobj *o)
 {
   global_State *g = G(L);
   GCobj *p, *t = obj2gco(mainthread(g));
-  GCRef *ref;
-  if (tofinalize(o))
+  GCRef *ref = &g->gc.root;
+
+  /* Already marked for finalization. */
+  if (isfinalized(gco2tab(o)))
     return;
 
-  /* Sweep points to current object, skip it. */
-  if (mref(g->gc.sweep, GCRef) == &o->gch.nextgc) 
+  /* UNSURE: Sweep points to current object, skip it.
+   * TBD: gclist?
+   * We could advance GC to some safe state, but wouldn't that be slow? */
+  if (mref(g->gc.sweep, GCRef) == &o->gch.nextgc)
     setmref(g->gc.sweep, gc_sweep(g, mref(g->gc.sweep, GCRef), 1));
 
   /* Find object in gc root list. */
-  for (ref = &g->gc.root, p = gcref(g->gc.root);
-       p != o;
-       ref = &p->gch.nextgc, p = gcnext(p)) {};
+  for (p = gcref(g->gc.root); p != o; p = gcnext(p))
+    ref = &p->gch.nextgc;
 
   /* Unlink. */
   setgcref(*ref, gcnext(o));
 
-  /* And put it into finalized list. */
+  /* And put it into userdata list. */
   setgcrefr(o->gch.nextgc, t->gch.nextgc);
   setgcref(t->gch.nextgc, o);
 
-  marktofinalize(o);
-  clearfinalized(o);
+  /* Mark as such. This is cleared just before __gc is called. */
+  markfinalized(o);
 
-  /* GC invariant. */
+  /* UNSURE: GC invariant. */
   if (g->gc.state == GCSpropagate || g->gc.state == GCSatomic)
     makewhite(g, o);
 }
@@ -589,7 +597,7 @@ void lj_gc_finalize_cdata(lua_State *L)
 	GCobj *o = gcV(&node[i].key);
 	TValue tmp;
 	makewhite(g, o);
-	o->gch.marked &= (uint8_t)~LJ_GC_CDATA_FIN;
+	o->gch.marked &= (uint8_t)~LJ_GC_FINALIZED;
 	copyTV(L, &tmp, &node[i].val);
 	setnilV(&node[i].val);
 	gc_call_finalizer(g, L, &tmp, o);

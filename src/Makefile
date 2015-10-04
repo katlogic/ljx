@@ -113,7 +113,7 @@ XCFLAGS=
 #
 # Features from Lua 5.3, notably integer support.
 # (work in progress)
-# XCFLAGS+= -DLUAJIT_ENABLE_LUA53COMPAT
+XCFLAGS+= -DLUAJIT_ENABLE_LUA53COMPAT
 #
 # This flag disables various kludges to emulate Lua Undefined/Underspecified
 # Behavior. Normally this is needed so buggy scripts continue to work,
