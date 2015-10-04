@@ -119,12 +119,12 @@ XCFLAGS+= -DLUAJIT_ENABLE_LUA53COMPAT
 # Behavior. Normally this is needed so buggy scripts continue to work,
 # but incurs small performance penalty. Think clang emulating gcc UBs
 # to make life easier.
-# XCFLAGS+= -DLUAJIT_DISABLE_UBKLUDGES
+#XCFLAGS+= -DLUAJIT_DISABLE_UBKLUDGES
 #
 # Support 4GB memory on Linux AMD64. Note that host process
 # must not be compiled PIE on hardened systems, ie to build luajit REPL, use:
 # $ make TARGET_LDFLAGS=-fno-pie
-XCFLAGS+=-DLUAJIT_ENABLE_4GB
+#XCFLAGS+=-DLUAJIT_ENABLE_4GB
 #
 # Disable the JIT compiler, i.e. turn LuaJIT into a pure interpreter.
 #XCFLAGS+= -DLUAJIT_DISABLE_JIT
