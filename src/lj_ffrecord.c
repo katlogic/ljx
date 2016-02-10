@@ -939,8 +939,9 @@ static int recff_emit_captures(jit_State *J, const MatchState *ms,
   return ms->level;
 }
 
-static void recff_string_findmatch(jit_State *J, RecordFFData *rd, int find)
+static void LJ_FASTCALL recff_string_findmatch(jit_State *J, RecordFFData *rd)
 {
+  int find = rd->data;
   TRef tr0, trstr, trsptr, trslen, trplen, trpat, trpptr;
   TRef trstart;
   int32_t start;
@@ -1015,17 +1016,6 @@ static void recff_string_findmatch(jit_State *J, RecordFFData *rd, int find)
     }
   }
 }
-
-static void LJ_FASTCALL recff_string_find(jit_State *J, RecordFFData *rd)
-{
-  recff_string_findmatch(J, rd, 1);
-}
-
-static void LJ_FASTCALL recff_string_match(jit_State *J, RecordFFData *rd)
-{
-  recff_string_findmatch(J, rd, 0);
-}
-
 
 static void LJ_FASTCALL recff_string_format(jit_State *J, RecordFFData *rd)
 {
