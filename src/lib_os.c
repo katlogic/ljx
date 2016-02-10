@@ -39,9 +39,14 @@
 
 LJLIB_CF(os_execute)
 {
-#if LJ_TARGET_CONSOLE
+#if LJ_NO_SYSTEM
+#if !LJ_51
   errno = ENOSYS;
   return luaL_fileresult(L, 0, NULL);
+#else
+    lua_pushinteger(L, -1);
+      return 1;
+#endif
 #else
   const char *cmd = luaL_optstring(L, 1, NULL);
   int stat = system(cmd);

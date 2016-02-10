@@ -145,8 +145,8 @@ void lj_snap_add(jit_State *J)
   MSize nsnap = J->cur.nsnap;
   MSize nsnapmap = J->cur.nsnapmap;
   /* Merge if no ins. inbetween or if requested and no guard inbetween. */
-  if (J->mergesnap ? !irt_isguard(J->guardemit) :
-      (nsnap > 0 && J->cur.snap[nsnap-1].ref == J->cur.nins)) {
+  if ((nsnap > 0 && J->cur.snap[nsnap-1].ref == J->cur.nins) ||
+      (J->mergesnap && !irt_isguard(J->guardemit))) {
     if (nsnap == 1) {  /* But preserve snap #0 PC. */
       emitir_raw(IRT(IR_NOP, IRT_NIL), 0, 0);
       goto nomerge;
@@ -518,7 +518,7 @@ void lj_snap_replay(jit_State *J, GCtrace *T)
 	    op2 = emitir_raw(IRT(IR_HIOP, IRT_I64), op2,
 			     snap_pref(J, T, map, nent, seen, (ir+1)->op2));
 	  }
-	  J->slot[snap_slot(sn)] = emitir(ir->ot, op1, op2);
+	  J->slot[snap_slot(sn)] = emitir(ir->ot & ~(IRT_MARK|IRT_ISPHI), op1, op2);
 	} else {
 	  IRIns *irs;
 	  TRef tr = emitir(ir->ot, op1, op2);
@@ -711,8 +711,9 @@ static void snap_unsink(jit_State *J, GCtrace *T, ExitState *ex,
   if (ir->o == IR_CNEW || ir->o == IR_CNEWI) {
     CTState *cts = ctype_cts(J->L);
     CTypeID id = (CTypeID)T->ir[ir->op1].i;
-    CTSize sz = lj_ctype_size(cts, id);
-    GCcdata *cd = lj_cdata_new(cts, id, sz);
+    CTSize sz;
+    CTInfo info = lj_ctype_info(cts, id, &sz);
+    GCcdata *cd = lj_cdata_newx(cts, id, sz, info);
     setcdataV(J->L, o, cd);
     if (ir->o == IR_CNEWI) {
       uint8_t *p = (uint8_t *)cdataptr(cd);
