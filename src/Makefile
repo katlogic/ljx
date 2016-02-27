@@ -200,6 +200,10 @@ else
     HOST_SYS= Windows
     HOST_MSYS= cygwin
   endif
+  ifneq (,$(findstring MSYS,$(HOST_SYS)))
+    HOST_SYS= Windows
+    HOST_MSYS= msys
+  endif
   # Use Clang for OSX host.
   ifeq (Darwin,$(HOST_SYS))
     DEFAULT_CC= clang
@@ -559,7 +563,12 @@ ifeq (Windows,$(TARGET_SYS))
   LUAJIT_T= luajit.exe
   ifeq (cygwin,$(HOST_MSYS))
     LUAJIT_SO= cyg$(TARGET_DLLNAME)
-  else
+  endif
+  ifeq (msys,$(HOST_MSYS))
+    TARGET_XTLIBS+= -lreadline
+    LUAJIT_SO= $(TARGET_DLLNAME)
+  endif
+  ifeq (mingw,$(HOST_MSYS))
     TARGET_XTLIBS+= -Wl,-Bstatic -lreadline -ltermcap
     LUAJIT_SO= $(TARGET_DLLNAME)
   endif

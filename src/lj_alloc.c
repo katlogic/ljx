@@ -80,7 +80,7 @@
 
 #define IS_DIRECT_BIT		(SIZE_T_ONE)
 
-#if LJ_TARGET_WINDOWS
+#if LJ_TARGET_WINDOWS || __MSYS__
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
