@@ -12,12 +12,14 @@
 #if LJ_HASJIT
 /* Context for recording an indexed load/store. */
 typedef struct RecordIndex {
+  TValue otabv;         /* Original runtime value of table (or indexed object). */
   TValue tabv;		/* Runtime value of table (or indexed object). */
   TValue keyv;		/* Runtime value of key. */
   TValue valv;		/* Runtime value of stored value. */
   TValue mobjv;		/* Runtime value of metamethod object. */
   GCtab *mtv;		/* Runtime value of metatable object. */
   cTValue *oldv;	/* Runtime value of previously stored value. */
+  TRef otab;            /* Original table (or indexed object) reference. */
   TRef tab;		/* Table (or indexed object) reference. */
   TRef key;		/* Key reference. */
   TRef val;		/* Value reference for a store or 0 for a load. */

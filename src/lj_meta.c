@@ -135,6 +135,7 @@ static TValue *mmcall(lua_State *L, ASMFunction cont, cTValue *mo,
 cTValue *lj_meta_tget(lua_State *L, cTValue *o, cTValue *k)
 {
   int loop;
+  cTValue *origo = o;
   for (loop = 0; loop < LJ_MAX_IDXCHAIN; loop++) {
     cTValue *mo;
     if (LJ_LIKELY(tvistab(o))) {
@@ -149,6 +150,7 @@ cTValue *lj_meta_tget(lua_State *L, cTValue *o, cTValue *k)
     }
     if (tvisfunc(mo)) {
       L->top = mmcall(L, lj_cont_ra, mo, o, k);
+      copyTV(L, L->top+2, origo);
       return NULL;  /* Trigger metamethod call. */
     }
     o = mo;
