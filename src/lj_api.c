@@ -28,6 +28,7 @@
 #include "lj_vm.h"
 #include "lj_strscan.h"
 #include "lj_strfmt.h"
+#include "lj_char.h"
 
 /* -- Common helper functions --------------------------------------------- */
 
@@ -134,7 +135,27 @@ LUA_API int lua_absindex(lua_State *L, int idx)
   return (int)(L->top - (L->base + idx - 1));
 }
 
+static void reverse(lua_State *L, TValue *from, TValue *to)
+{
+  for (; from < to; from++, to--) {
+    TValue temp;
+    copyTV(L, &temp, from);
+    copyTV(L, from, to);
+    copyTV(L, to, &temp);
+  }
+}
 
+LUA_API void lua_rotate (lua_State *L, int idx, int n) {
+  TValue *p, *t, *m;
+  t = L->top - 1;  /* end of stack segment being rotated */
+  p = stkindex2adr(L, idx);  /* start of segment */
+  api_checkvalidindex(L, p);
+  api_check(L, (n >= 0 ? n : -n) <= ((t - p) + 1));
+  m = (n >= 0 ? t - n : p - n - 1);  /* end of prefix */
+  reverse(L, p, m);  /* reverse the prefix with length 'n' */
+  reverse(L, m + 1, t);  /* reverse the suffix */
+  reverse(L, p, t);  /* reverse the entire segment */
+}
 
 LUA_API int lua_gettop(lua_State *L)
 {
@@ -208,6 +229,8 @@ LUA_API void lua_copy (lua_State *L, int fromidx, int toidx)
     api_checkvalidindex(L, src);
     api_checkvalidindex(L, dst);
     copyTV(L, dst, src);
+    if (toidx < LUA_UVINDEX)  /* Need a barrier for upvalues. */
+      lj_gc_barrier(L, curr_func(L), src);
 }
 
 LUA_API void lua_pushvalue(lua_State *L, int idx)
@@ -216,11 +239,26 @@ LUA_API void lua_pushvalue(lua_State *L, int idx)
   incr_top(L);
 }
 
+LUA_API size_t lua_stringtonumber (lua_State *L, const char *s)
+{
+  char* endptr;
+  lua_Number n = lua_str2number(s, &endptr);
+  if (endptr != s) {
+    while (*endptr != '\0' && lj_char_isspace((unsigned char)*endptr))
+      ++endptr;
+    if (*endptr == '\0') {
+      lua_pushnumber(L, n);
+      return endptr - s + 1;
+    }
+  }
+  return 0;
+}
+
 /* -- Stack getters ------------------------------------------------------- */
 
-LUA_API int lua_type(lua_State *L, int idx)
+static int ljx_tv2type(lua_State *L, cTValue *o)
 {
-  cTValue *o = index2adr(L, idx);
+  if (!o) return LUA_TNIL;
   if (tvisnumber(o)) {
     return LUA_TNUMBER;
 #if LJ_64 && !LJ_GC64
@@ -239,6 +277,11 @@ LUA_API int lua_type(lua_State *L, int idx)
     lua_assert(tt != LUA_TNIL || tvisnil(o));
     return tt;
   }
+}
+
+LUA_API int lua_type(lua_State *L, int idx)
+{
+  return ljx_tv2type(L, index2adr(L, idx));
 }
 
 LUALIB_API void luaL_checktype(lua_State *L, int idx, int tt)
@@ -801,7 +844,7 @@ LUA_API void lua_concat(lua_State *L, int n)
 
 /* -- Object getters ------------------------------------------------------ */
 
-LUA_API void lua_gettable(lua_State *L, int idx)
+LUA_API int lua_gettable(lua_State *L, int idx)
 {
   cTValue *v, *t = index2adr(L, idx);
   api_checkvalidindex(L, t);
@@ -813,9 +856,28 @@ LUA_API void lua_gettable(lua_State *L, int idx)
     v = L->top+1+LJ_FR2;
   }
   copyTV(L, L->top-1, v);
+  return ljx_tv2type(L, v);
 }
 
-LUA_API void lua_getfield(lua_State *L, int idx, const char *k)
+LUA_API int lua_geti(lua_State *L, int idx, lua_Integer i)
+{
+  cTValue *v, *t = index2adr(L, idx);
+  if (!(v = lj_tab_getint(tabV(t), i))) {
+    TValue k;
+    setnumV(&k, (lua_Number)i);
+    v = lj_meta_tget(L, t, &k);
+  }
+  if (v == NULL) {
+    L->top += 2;
+    lj_vm_call(L, L->top-2, 1+1);
+    L->top -= 2+LJ_FR2;
+    v = L->top+1+LJ_FR2;
+  }
+  copyTV(L, L->top-1, v);
+  return ljx_tv2type(L, v);
+}
+
+LUA_API int lua_getfield(lua_State *L, int idx, const char *k)
 {
   cTValue *v, *t = index2adr(L, idx);
   TValue key;
@@ -830,16 +892,19 @@ LUA_API void lua_getfield(lua_State *L, int idx, const char *k)
   }
   copyTV(L, L->top, v);
   incr_top(L);
+  return ljx_tv2type(L, v);
 }
 
-LUA_API void lua_rawget(lua_State *L, int idx)
+LUA_API int lua_rawget(lua_State *L, int idx)
 {
-  cTValue *t = index2adr(L, idx);
+  cTValue *v, *t = index2adr(L, idx);
   api_check(L, tvistab(t));
-  copyTV(L, L->top-1, lj_tab_get(L, tabV(t), L->top-1));
+  copyTV(L, L->top-1, (v = lj_tab_get(L, tabV(t), L->top-1)));
+  return ljx_tv2type(L, v);
 }
 
-LUA_API void lua_rawgeti(lua_State *L, int idx, int n)
+
+LUA_API int lua_rawgeti(lua_State *L, int idx, int n)
 {
   cTValue *v, *t = index2adr(L, idx);
   api_check(L, tvistab(t));
@@ -850,8 +915,10 @@ LUA_API void lua_rawgeti(lua_State *L, int idx, int n)
     setnilV(L->top);
   }
   incr_top(L);
+  return ljx_tv2type(L, v);
 }
-LUA_API void lua_rawgetp(lua_State *L, int idx, const void *p)
+
+LUA_API int lua_rawgetp(lua_State *L, int idx, const void *p)
 {
   cTValue *v, *t = index2adr(L, idx);
   TValue key;
@@ -864,6 +931,7 @@ LUA_API void lua_rawgetp(lua_State *L, int idx, const void *p)
     setnilV(L->top);
   }
   incr_top(L);
+  return ljx_tv2type(L, v);
 }
 
 
@@ -1034,13 +1102,33 @@ LUA_API void lua_setfield(lua_State *L, int idx, const char *k)
   }
 }
 
+LUA_API void lua_seti(lua_State *L, int idx, lua_Integer i)
+{
+  TValue *o, k;
+  cTValue *t = index2adr(L, idx);
+  api_checknelems(L, 1);
+  api_checkvalidindex(L, t);
+  setnumV(&k, (lua_Number)i);
+  o = lj_meta_tset(L, t, &k);
+  if (o) {
+    /* NOBARRIER: lj_meta_tset ensures the table is not black. */
+    copyTV(L, o, --L->top);
+  } else {
+    TValue *base = L->top;
+    copyTV(L, base+2, base-3-2*LJ_FR2);
+    L->top = base+3;
+    lj_vm_call(L, base, 0+1);
+    L->top -= 2+LJ_FR2;
+  }
+}
+
 #if !LJ_51
 LUA_API void lua_setglobal (lua_State *L, const char *var)
 {
   return lua_setfield(L, LUA_GLOBALSINDEX, var);
 }
 
-LUA_API void lua_getglobal (lua_State *L, const char *var)
+LUA_API int lua_getglobal (lua_State *L, const char *var)
 {
   return lua_getfield(L, LUA_GLOBALSINDEX, var);
 }
@@ -1217,6 +1305,25 @@ LUA_API void lua_call(lua_State *L, int nargs, int nresults)
   api_checknelems(L, nargs+1);
   lj_vm_call(L, api_call_base(L, nargs), nresults+1);
 }
+
+/* XXX TBD these are not good at all. */
+LUA_API void  lua_callk(lua_State *L, int nargs, int nresults,
+		                           lua_KContext ctx, lua_KFunction k)
+{
+  lua_call(L, nargs, nresults);
+}
+
+LUA_API int lua_pcallk(lua_State *L, int nargs, int nresults, int errfunc,
+		                            lua_KContext ctx, lua_KFunction k)
+{
+  return lua_pcall(L, nargs, nresults, errfunc);
+}
+LUA_API int  (lua_yieldk)(lua_State *L, int nresults, lua_KContext ctx,
+                               lua_KFunction k)
+{
+  return lua_yield(L, nresults);
+}
+
 
 LUA_API int lua_pcall(lua_State *L, int nargs, int nresults, int errfunc)
 {

@@ -281,6 +281,13 @@ LUALIB_API char *luaL_prepbuffer(luaL_Buffer *B)
   return B->buffer;
 }
 
+LUALIB_API char *luaL_prepbuffersize(luaL_Buffer *B, size_t size)
+{
+  if (size > LUAL_BUFFERSIZE)
+    luaL_error(B->L, "buffer too big (max LUAL_BUFFERSIZE=%d)", LUAL_BUFFERSIZE);
+  return luaL_prepbuffer(B);
+}
+
 LUALIB_API void luaL_addlstring(luaL_Buffer *B, const char *s, size_t l)
 {
   while (l--)

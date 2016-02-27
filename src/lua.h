@@ -90,6 +90,8 @@
 typedef struct lua_State lua_State;
 
 typedef int (*lua_CFunction) (lua_State *L);
+typedef LUA_KCONTEXT lua_KContext;
+typedef int (*lua_KFunction) (lua_State *L, int status, lua_KContext ctx);
 
 
 /*
@@ -159,10 +161,12 @@ LUA_API lua_CFunction (lua_atpanic) (lua_State *L, lua_CFunction panicf);
 LUA_API int   (lua_absindex) (lua_State *L, int idx);
 LUA_API int   (lua_gettop) (lua_State *L);
 LUA_API void  (lua_settop) (lua_State *L, int idx);
+LUA_API void  (lua_rotate) (lua_State *L, int idx, int n);
 LUA_API void  (lua_pushvalue) (lua_State *L, int idx);
 LUA_API void  (lua_remove) (lua_State *L, int idx);
 LUA_API void  (lua_insert) (lua_State *L, int idx);
 LUA_API void  (lua_replace) (lua_State *L, int idx);
+LUA_API void  (lua_copy) (lua_State *L, int fromidx, int toidx);
 LUA_API int   (lua_checkstack) (lua_State *L, int sz);
 
 LUA_API void  (lua_xmove) (lua_State *from, lua_State *to, int n);
@@ -230,11 +234,13 @@ LUA_API int   (lua_pushthread) (lua_State *L);
 /*
 ** get functions (Lua -> stack)
 */
-LUA_API void  (lua_gettable) (lua_State *L, int idx);
-LUA_API void  (lua_getfield) (lua_State *L, int idx, const char *k);
-LUA_API void  (lua_rawget) (lua_State *L, int idx);
-LUA_API void  (lua_rawgeti) (lua_State *L, int idx, int n);
-LUA_API void  (lua_rawgetp) (lua_State *L, int idx, const void *);
+LUA_API int   (lua_gettable) (lua_State *L, int idx);
+LUA_API int   (lua_getfield) (lua_State *L, int idx, const char *k);
+LUA_API int   (lua_rawget) (lua_State *L, int idx);
+LUA_API int   (lua_geti) (lua_State *L, int idx, lua_Integer n);
+LUA_API int   (lua_rawgeti) (lua_State *L, int idx, int n);
+LUA_API int   (lua_rawgetp) (lua_State *L, int idx, const void *);
+
 LUA_API void  (lua_createtable) (lua_State *L, int narr, int nrec);
 LUA_API void *(lua_newuserdata) (lua_State *L, size_t sz);
 LUA_API int   (lua_getmetatable) (lua_State *L, int objindex);
@@ -258,7 +264,7 @@ LUA_API void  (lua_setuservalue) (lua_State *L, int idx);
 #define lua_getglobal(L,s)	lua_getfield(L, LUA_GLOBALSINDEX, (s))
 #else
 LUA_API void (lua_setglobal) (lua_State *L, const char *var);
-LUA_API void (lua_getglobal) (lua_State *L, const char *var);
+LUA_API int (lua_getglobal) (lua_State *L, const char *var);
 #endif
 
 
@@ -266,6 +272,10 @@ LUA_API void (lua_getglobal) (lua_State *L, const char *var);
 /*
 ** `load' and `call' functions (load and run Lua code)
 */
+LUA_API void  (lua_callk) (lua_State *L, int nargs, int nresults,
+		                           lua_KContext ctx, lua_KFunction k);
+LUA_API int   (lua_pcallk) (lua_State *L, int nargs, int nresults, int errfunc,
+		                            lua_KContext ctx, lua_KFunction k);
 LUA_API void  (lua_call) (lua_State *L, int nargs, int nresults);
 LUA_API int   (lua_pcall) (lua_State *L, int nargs, int nresults, int errfunc);
 LUA_API int   (lua_cpcall) (lua_State *L, lua_CFunction func, void *ud);
@@ -278,6 +288,8 @@ LUA_API int (lua_dump) (lua_State *L, lua_Writer writer, void *data);
 /*
 ** coroutine functions
 */
+LUA_API int  (lua_yieldk)     (lua_State *L, int nresults, lua_KContext ctx,
+                               lua_KFunction k);
 LUA_API int  (lua_yield) (lua_State *L, int nresults);
 LUA_API int  (lua_resume) (lua_State *L, int narg);
 LUA_API int  (lua_status) (lua_State *L);
@@ -309,6 +321,7 @@ LUA_API int   (lua_next) (lua_State *L, int idx);
 
 LUA_API void  (lua_concat) (lua_State *L, int n);
 
+LUA_API size_t (lua_stringtonumber) (lua_State *L, const char *s);
 LUA_API lua_Alloc (lua_getallocf) (lua_State *L, void **ud);
 LUA_API void lua_setallocf (lua_State *L, lua_Alloc f, void *ud);
 

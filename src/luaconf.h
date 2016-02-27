@@ -134,6 +134,9 @@
 ** Blame Lua for depending on BUFSIZ in the ABI, blame **** for wrecking it.
 */
 #define LUAL_BUFFERSIZE	(BUFSIZ > 16384 ? 8192 : BUFSIZ)
+#define LUA_KCONTEXT    ptrdiff_t
+#define lua_str2number(s,p)	strtod((s), (p))
+
 
 /* The following defines are here only for compatibility with luaconf.h
 ** from the standard Lua distribution. They must not be changed for LuaJIT.
