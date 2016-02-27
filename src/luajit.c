@@ -22,7 +22,6 @@
 
 #include "lj_arch.h"
 
-#if LJ_TARGET_POSIX
 #include <unistd.h>
 
 #if !defined(lua_readline)
@@ -241,11 +240,10 @@ static void lua_rl_exit(lua_State *L)
                    fgets(b, LUA_MAXINPUT, stdin) != NULL)  /* get line */
 #define lua_saveline(L,idx)     { (void)L; (void)idx; }
 #define lua_freeline(L,b)       { (void)L; (void)b; }
-
 #endif
 #endif
 
-
+#if LJ_TARGET_POSIX
 #define lua_stdin_is_tty()	isatty(0)
 #elif LJ_TARGET_WINDOWS
 #include <io.h>

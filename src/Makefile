@@ -559,6 +559,8 @@ ifeq (Windows,$(TARGET_SYS))
   ifeq (cygwin,$(HOST_MSYS))
     LUAJIT_SO= cyg$(TARGET_DLLNAME)
   else
+    TARGET_XLDFLAGS+= -Wl,-static
+    TARGET_XLIBS+= -lreadline -ltermcap
     LUAJIT_SO= $(TARGET_DLLNAME)
   endif
   # Mixed mode is not supported on Windows. And static mode doesn't work well.
