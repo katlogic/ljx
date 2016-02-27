@@ -87,13 +87,19 @@ FILES_JITLIB= bc.lua bcsave.lua dump.lua p.lua v.lua zone.lua \
 	      dis_x86.lua dis_x64.lua dis_arm.lua dis_ppc.lua \
 	      dis_mips.lua dis_mipsel.lua vmdef.lua
 
-ifeq (,$(findstring Windows,$(OS)))
-  ifeq (Darwin,$(shell uname -s))
-    INSTALL_SONAME= $(INSTALL_DYLIBNAME)
-    INSTALL_SHORT1= $(INSTALL_LIB)/$(INSTALL_DYLIBSHORT1)
-    INSTALL_SHORT2= $(INSTALL_LIB)/$(INSTALL_DYLIBSHORT2)
-    LDCONFIG= :
-  endif
+ifeq (Darwin,$(shell uname -s))
+  INSTALL_SONAME= $(INSTALL_DYLIBNAME)
+  INSTALL_SHORT1= $(INSTALL_LIB)/$(INSTALL_DYLIBSHORT1)
+  INSTALL_SHORT2= $(INSTALL_LIB)/$(INSTALL_DYLIBSHORT2)
+  LDCONFIG= :
+endif
+ifneq (,$(findstring MSYS,$(shell uname -s)))
+  FILE_SO=lua52.dll
+  INSTALL_SONAME=$(FILE_SO) 
+  INSTALL_TNAME= ljx.exe
+  INSTALL_TSYMNAME= luajit.exe
+  FILE_T=luajit.exe
+  LDCONFIG= :
 endif
 
 ##############################################################################
