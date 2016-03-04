@@ -17,6 +17,9 @@
 typedef struct CLibrary {
   void *handle;		/* Opaque handle for dynamic library loader. */
   GCtab *cache;		/* Cache for resolved symbols. Anchored in ud->env. */
+#ifdef __MSYS__
+  int system;
+#endif
 } CLibrary;
 
 LJ_FUNC TValue *lj_clib_index(lua_State *L, CLibrary *cl, GCstr *name);

@@ -143,6 +143,10 @@ static void clib_unloadlib(CLibrary *cl)
 static void *clib_getsym(CLibrary *cl, const char *name)
 {
   void *p = dlsym(cl->handle, name);
+#ifdef __MSYS__
+  if (!p && cl->system)
+    p = dlsym(NULL, name);
+#endif
   return p;
 }
 
@@ -416,7 +420,13 @@ void lj_clib_unload(CLibrary *cl)
 void lj_clib_default(lua_State *L, GCtab *mt)
 {
   CLibrary *cl = clib_new(L, mt);
+#if __MSYS__
+  cl->handle = dlopen("msys-2.0.dll", RTLD_LOCAL);
+  cl->system = 1;
+  lua_assert(cl->handle);
+#else
   cl->handle = CLIB_DEFHANDLE;
+#endif
 }
 
 #endif
