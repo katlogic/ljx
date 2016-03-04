@@ -1448,26 +1448,25 @@ static void fs_fixup_uv1(FuncState *fs, GCproto *pt, uint16_t *uv)
   if (!(L2J(fs->ls->L)->flags & JIT_F_OPT_LLIFT))
     return;
 
-  
-  while (p->prev &&
-      p->prev->prev /* TBD: Solve xpcall/coroutine regression when p->prev has lifted closure */
-      ) {
+  while (p->prev) {
     /* check */
     for (i = 0; i < nuv; i++) {
       if ((uv[i] != PROTO_UV_HOLE) && ((!(uv[i] & PROTO_UV_CHAINED)) && (p->uvcount[i])))
         goto stop;
     }
 
-    /* resolve */
+    /* remember status for current fun if next check above bails in next round */
     memcpy(puv, uv, fs->nuv*sizeof(VarIndex));
+
+    /* and resolve one step up */
     for (i = 0; i < nuv; i++) {
-      if (p->uvcount[i] == 0)
+      if (p->uvcount[i] == 0) /* this uv is dead */
         uv[i] = PROTO_UV_HOLE;
       if (uv[i] == PROTO_UV_HOLE)
         continue;
-      if (uv[i] & PROTO_UV_CHAINED) {
+      if (uv[i] & PROTO_UV_CHAINED) { /* it is chained to prev, resolve */
         p->uvcount[i]--;
-        uv[i] = p->prev->uvval[i];
+        uv[i] = p->prev->uvval[uv[i] & PROTO_UV_MASK];
       } else {
         lua_assert(0);
       }
