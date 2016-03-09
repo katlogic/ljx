@@ -65,6 +65,8 @@ lj_buf.o: lj_buf.c lj_obj.h lua.h luaconf.h lj_def.h lj_arch.h lj_gc.h \
 lj_carith.o: lj_carith.c lj_obj.h lua.h luaconf.h lj_def.h lj_arch.h \
  lj_gc.h lj_err.h lj_errmsg.h lj_tab.h lj_meta.h lj_ir.h lj_ctype.h \
  lj_cconv.h lj_cdata.h lj_carith.h lj_strscan.h
+lj_bitwise.o: lj_bitwise.h lj_obj.h lua.h luaconf.h lj_def.h lj_arch.h \
+ lj_gc.h lj_err.h lj_strscan.h lj_cdata.h
 lj_ccall.o: lj_ccall.c lj_obj.h lua.h luaconf.h lj_def.h lj_arch.h \
  lj_gc.h lj_err.h lj_errmsg.h lj_tab.h lj_ctype.h lj_cconv.h lj_cdata.h \
  lj_ccall.h lj_trace.h lj_jit.h lj_ir.h lj_dispatch.h lj_bc.h \

@@ -3701,27 +3701,21 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  jnz <3
     |  jmp ->vmeta_len			// 'no __len' flag NOT set: check.
     break;
+  case BC_BNOT:
+    |  ins_AD	// RA = dst, RD = src
+    |  jmp ->vmeta_unm
+    break;
 
   /* -- Binary ops -------------------------------------------------------- */
-#if !LJ_53
   case BC_IDIV:
   case BC_BAND:
   case BC_BOR:
   case BC_BXOR:
   case BC_BSHL:
   case BC_BSHR:
-  case BC_BNOT:
+    |  ins_ABC
+    |  jmp ->vmeta_arith_vv
     break;
-#else
-  case BC_IDIV:
-  case BC_BAND:
-  case BC_BOR:
-  case BC_BXOR:
-  case BC_BSHL:
-  case BC_BSHR:
-  case BC_BNOT:
-    break;
-#endif
 
     |.macro ins_arithpre, sseins, ssereg
     |  ins_ABC

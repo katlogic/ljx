@@ -22,6 +22,7 @@
 #include "lj_strscan.h"
 #include "lj_strfmt.h"
 #include "lj_lib.h"
+#include "lj_bitwise.h"
 
 /* -- Metamethod handling ------------------------------------------------- */
 
@@ -218,18 +219,26 @@ TValue *lj_meta_arith(lua_State *L, TValue *ra, cTValue *rb, cTValue *rc,
   MMS mm = bcmode_mm(op);
   TValue tempb, tempc;
   cTValue *b, *c;
+#if LJ_53
+  if (mm >= MM_bnot) {
+    if (lj_vm_foldbit(L, ra, rb, rc, mm) < 1)
+      return NULL;
+    goto metacall;
+  }
+#endif
   if ((b = str2num(rb, &tempb)) != NULL &&
       (c = str2num(rc, &tempc)) != NULL) {  /* Try coercion first. */
     setnumV(ra, lj_vm_foldarith(numV(b), numV(c), (int)mm-MM_add));
     return NULL;
-  } else {
+  }
+metacall: {
     cTValue *mo = lj_meta_lookup(L, rb, mm);
     if (tvisnil(mo)) {
       mo = lj_meta_lookup(L, rc, mm);
       if (tvisnil(mo)) {
-	if (str2num(rb, &tempb) == NULL) rc = rb;
-	lj_err_optype(L, rc, LJ_ERR_OPARITH);
-	return NULL;  /* unreachable */
+        if (str2num(rb, &tempb) == NULL) rc = rb;
+        lj_err_optype(L, rc, LJ_ERR_OPARITH);
+        return NULL;  /* unreachable */
       }
     }
     return mmcall(L, lj_cont_ra, mo, rb, rc);
