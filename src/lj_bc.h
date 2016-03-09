@@ -103,8 +103,8 @@
   _(BAND,	dst,	var,	var,	band) \
   _(BOR,	dst,	var,	var,	bor) \
   _(BXOR,	dst,	var,	var,	bxor) \
-  _(BSHL,	dst,	var,	var,	bshl) \
-  _(BSHR,	dst,	var,	var,	bshr) \
+  _(SHL,	dst,	var,	var,	shl) \
+  _(SHR,	dst,	var,	var,	shr) \
   _(BNOT,	dst,	___,	var,	bnot) \
   \
   /* Binary ops. ORDER OPR. VV last, POW must be next. */ \

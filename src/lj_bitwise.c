@@ -38,7 +38,7 @@ static int get_arg(lua_State *L, cTValue *o, int64_t *res)
     if (!lj_strscan_number(strV(o), &tmp))
       return -1;
     o = &tmp;
-  } else return -1;
+  }
   if (LJ_LIKELY(tvisint(o))) {
     *res = (uint32_t)intV(o);
     return 0;
@@ -52,7 +52,7 @@ static int get_arg(lua_State *L, cTValue *o, int64_t *res)
 
 #define B_METHODS(_) \
 _(bnot,=~x) _(idiv, /=y) _(band, &=y) _(bor, |=y) \
-_(bxor, ^=y) _(bshl, <<=y) _(bshr, >>=y)
+_(bxor, ^=y) _(shl, <<=y) _(shr, >>=y)
 #define CASE(name, suff) \
   case MM_##name: x suff; break;
 
@@ -62,11 +62,10 @@ int lj_vm_foldbit(lua_State *L, TValue *ra, cTValue *rb, cTValue *rc,
   int id1, id2;
   int64_t a,b;
 
-  if (((id1 = get_arg(L, ra, &a)) == -1) || ((id2 = get_arg(L, rb, &b)) == -1))
+  if (((id1 = get_arg(L, rb, &a)) == -1) || ((id2 = get_arg(L, rc, &b)) == -1))
     return -1; /* call metamethod */
-
   /* expand to common type, with the exception of shifts */
-  if (mm < MM_bshl && id2 > id1)
+  if (mm < MM_shl && id2 > id1)
     id1 = id2;
   /* int32 */
   if (!id1) {

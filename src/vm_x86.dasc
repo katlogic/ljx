@@ -3711,8 +3711,8 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
   case BC_BAND:
   case BC_BOR:
   case BC_BXOR:
-  case BC_BSHL:
-  case BC_BSHR:
+  case BC_SHL:
+  case BC_SHR:
     |  ins_ABC
     |  jmp ->vmeta_arith_vv
     break;

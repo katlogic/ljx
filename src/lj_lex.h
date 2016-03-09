@@ -16,6 +16,11 @@
   _(and) _(break) _(do) _(else) _(elseif) _(end) _(false) \
   _(for) _(function) _(goto) _(if) _(in) _(local) _(nil) _(not) _(or) \
   _(repeat) _(return) _(then) _(true) _(until) _(while) \
+
+#define TKDEF53(_,__) \
+  __(idiv, <idiv>) __(shl, <<) __(shr, >>)
+
+#define TKDEF2(_,__) \
   __(concat, ..) __(dots, ...) __(eq, ==) __(ge, >=) __(le, <=) __(ne, ~=) \
   __(label, ::) __(number, <number>) __(name, <name>) __(string, <string>) \
   __(eof, <eof>)
@@ -25,6 +30,10 @@ enum {
 #define TKENUM1(name)		TK_##name,
 #define TKENUM2(name, sym)	TK_##name,
 TKDEF(TKENUM1, TKENUM2)
+#if LJ_53
+TKDEF53(TKENUM1, TKENUM2)
+#endif
+TKDEF2(TKENUM1, TKENUM2)
 #undef TKENUM1
 #undef TKENUM2
   TK_RESERVED = TK_while - TK_OFS

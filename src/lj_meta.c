@@ -221,9 +221,9 @@ TValue *lj_meta_arith(lua_State *L, TValue *ra, cTValue *rb, cTValue *rc,
   cTValue *b, *c;
 #if LJ_53
   if (mm >= MM_bnot) {
-    if (lj_vm_foldbit(L, ra, rb, rc, mm) < 1)
-      return NULL;
-    goto metacall;
+    if (lj_vm_foldbit(L, ra, rb, rc, mm) < 0)
+      goto metacall;
+    return NULL;
   }
 #endif
   if ((b = str2num(rb, &tempb)) != NULL &&

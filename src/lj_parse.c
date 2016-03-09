@@ -156,7 +156,7 @@ typedef struct FuncState {
 typedef enum BinOpr {
   OPR_ADD, OPR_SUB, OPR_MUL, OPR_DIV, OPR_MOD, OPR_POW,
   OPR_DUMMY1, OPR_DUMMY2, /* ORDER ARITH */
-  OPR_IDIV, OPR_BAND, OPR_BOR, OPR_BXOR, OPR_BSHL, OPR_BSHR,
+  OPR_IDIV, OPR_BAND, OPR_BOR, OPR_BXOR, OPR_SHL, OPR_SHR,
   OPR_CONCAT,
   OPR_NE, OPR_EQ,
   OPR_LT, OPR_GE, OPR_LE, OPR_GT,
@@ -803,12 +803,18 @@ static void bcemit_arith(FuncState *fs, BinOpr opr, ExpDesc *e1, ExpDesc *e2)
 {
   BCReg rb, rc, t;
   uint32_t op;
-  if (foldarith(opr, e1, e2))
+  if ((opr < OPR_IDIV) && foldarith(opr, e1, e2))
     return;
   if (opr == OPR_POW) {
     op = BC_POW;
     rc = expr_toanyreg(fs, e2);
     rb = expr_toanyreg(fs, e1);
+#if LJ_53
+  } if (opr >= OPR_IDIV) {
+    op = opr - OPR_IDIV + BC_IDIV;
+    rc = expr_toanyreg(fs, e2);
+    rb = expr_toanyreg(fs, e1);
+#endif
   } else {
     op = opr-OPR_ADD+BC_ADDVV;
     /* Must discharge 2nd operand first since VINDEXED might free regs. */
@@ -960,7 +966,7 @@ static void bcemit_unop(FuncState *fs, BCOp op, ExpDesc *e)
       lua_assert(e->k == VNONRELOC);
     }
   } else {
-    lua_assert(op == BC_UNM || op == BC_LEN);
+    lua_assert(op == BC_UNM || op == BC_LEN || op == BC_BNOT);
     if (op == BC_UNM && !expr_hasjump(e)) {  /* Constant-fold negations. */
 #if LJ_HASFFI
       if (e->k == VKCDATA) {  /* Fold in-place since cdata is not interned. */
@@ -2154,6 +2160,14 @@ static BinOpr token2binop(LexToken tok)
   case TK_ge:	return OPR_GE;
   case TK_and:	return OPR_AND;
   case TK_or:	return OPR_OR;
+#if LJ_53
+  case TK_idiv: return OPR_IDIV;
+  case '&':     return OPR_BAND;
+  case '|':     return OPR_BOR;
+  case '~':     return OPR_BXOR;
+  case TK_shl:  return OPR_SHL;
+  case TK_shr:  return OPR_SHR;
+#endif
   default:	return OPR_NOBINOPR;
   }
 }
@@ -2189,6 +2203,10 @@ static void expr_unop(LexState *ls, ExpDesc *v)
     op = BC_UNM;
   } else if (ls->tok == '#') {
     op = BC_LEN;
+#if LJ_53
+  } else if (ls->tok == '~') {
+    op = BC_BNOT;
+#endif
   } else {
     expr_simple(ls, v);
     return;

@@ -302,12 +302,12 @@ LJLIB_CF(ffi_meta___bxor)	LJLIB_REC(cdata_arith MM_bxor)
   return ffi_arith(L);
 }
 
-LJLIB_CF(ffi_meta___bshl)	LJLIB_REC(cdata_arith MM_bshl)
+LJLIB_CF(ffi_meta___shl)	LJLIB_REC(cdata_arith MM_shl)
 {
   return ffi_arith(L);
 }
 
-LJLIB_CF(ffi_meta___bshr)	LJLIB_REC(cdata_arith MM_bshr)
+LJLIB_CF(ffi_meta___shr)	LJLIB_REC(cdata_arith MM_shr)
 {
   return ffi_arith(L);
 }

@@ -32,6 +32,10 @@ static const char *const tokennames[] = {
 #define TKSTR1(name)		#name,
 #define TKSTR2(name, sym)	#sym,
 TKDEF(TKSTR1, TKSTR2)
+#if LJ_53
+TKDEF53(TKSTR1, TKSTR2)
+#endif
+TKDEF2(TKSTR1, TKSTR2)
 #undef TKSTR1
 #undef TKSTR2
   NULL
@@ -284,6 +288,14 @@ static void lex_string(LexState *ls, TValue *tv)
 }
 
 /* -- Main lexical scanner ------------------------------------------------ */
+static LJ_AINLINE int check(LexState *ls, LexChar c)
+{
+  if (ls->c == c) {
+    lex_next(ls);
+    return 1;
+  }
+  return 0;
+}
 
 /* Get next lexical token. */
 static LexToken lex_scan(LexState *ls, TValue *tv)
@@ -351,10 +363,18 @@ static LexToken lex_scan(LexState *ls, TValue *tv)
       if (ls->c != '=') return '='; else { lex_next(ls); return TK_eq; }
     case '<':
       lex_next(ls);
-      if (ls->c != '=') return '<'; else { lex_next(ls); return TK_le; }
+      if (check(ls, '=')) return TK_le;
+#if LJ_53
+      if (check(ls, '<')) return TK_shl;
+#endif
+      return '<';
     case '>':
       lex_next(ls);
-      if (ls->c != '=') return '>'; else { lex_next(ls); return TK_ge; }
+      if (check(ls, '=')) return TK_ge;
+#if LJ_53
+      if (check(ls, '>')) return TK_shr;
+#endif
+      return '>';
     case '~':
       lex_next(ls);
       if (ls->c != '=') return '~'; else { lex_next(ls); return TK_ne; }
