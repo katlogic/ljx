@@ -54,14 +54,14 @@
   _(KSLOT,	N , ref, lit) \
   \
   /* Arithmetic ops. ORDER ARITH */ \
-  _(BNOT,	N , ref, ___) \
-  _(NEG,	N , ref, ___) \
   _(ADD,	C , ref, ref) \
   _(SUB,	N , ref, ref) \
   _(MUL,	C , ref, ref) \
   _(DIV,	N , ref, ref) \
   _(MOD,	N , ref, ref) \
   _(POW,	N , ref, ref) \
+  _(NEG,	N , ref, ___) \
+  _(BNOT,	N , ref, ___) \
   _(IDIV,	N , ref, ref) \
   _(BAND,	C , ref, ref) /* ORDER BITLIB BAND */ \
   _(BOR,	C , ref, ref) \
@@ -71,9 +71,8 @@
   _(BSAR,	N , ref, ref) \
   _(BROL,	N , ref, ref) \
   _(BROR,	N , ref, ref) \
-  \
-  /* Bit ops. ORDER BITLIB together with above. */ \
   _(BSWAP,	N , ref, ___) \
+  \
   _(ABS,	N , ref, ref) \
   _(ATAN2,	N , ref, ref) \
   _(LDEXP,	N , ref, ref) \

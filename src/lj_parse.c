@@ -154,7 +154,8 @@ typedef struct FuncState {
 
 /* Binary and unary operators. ORDER OPR */
 typedef enum BinOpr {
-  OPR_ADD, OPR_SUB, OPR_MUL, OPR_DIV, OPR_MOD, OPR_POW, /* ORDER ARITH */
+  OPR_ADD, OPR_SUB, OPR_MUL, OPR_DIV, OPR_MOD, OPR_POW,
+  OPR_DUMMY1, OPR_DUMMY2, /* ORDER ARITH */
   OPR_IDIV, OPR_BAND, OPR_BOR, OPR_BXOR, OPR_BSHL, OPR_BSHR,
   OPR_CONCAT,
   OPR_NE, OPR_EQ,
@@ -2164,6 +2165,7 @@ static const struct {
 } priority[] = {
   /* ADD SUB MUL DIV MOD POW */
   {10,10}, {10,10}, {11,11}, {11,11}, {11,11}, {14,13},
+  {0,0},{0,0}, /* dummy */
   {11,11}, {6,6}, {4,4}, {5,5}, 	/* IDIV BAND BOR BXOR */
   {7,7}, {7,7}, 			/* SHL SHR */
   {9,8},				/* CONCAT (right associative) */

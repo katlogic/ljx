@@ -242,16 +242,6 @@ LJLIB_CF(ffi_meta___call)	LJLIB_REC(cdata_call)
   return lj_cf_ffi_new(L);
 }
 
-LJLIB_CF(ffi_meta___bnot)	LJLIB_REC(cdata_arith MM_bnot)
-{
-  return ffi_arith(L);
-}
-
-LJLIB_CF(ffi_meta___unm)	LJLIB_REC(cdata_arith MM_unm)
-{
-  return ffi_arith(L);
-}
-
 LJLIB_CF(ffi_meta___add)	LJLIB_REC(cdata_arith MM_add)
 {
   return ffi_arith(L);
@@ -278,6 +268,16 @@ LJLIB_CF(ffi_meta___mod)	LJLIB_REC(cdata_arith MM_mod)
 }
 
 LJLIB_CF(ffi_meta___pow)	LJLIB_REC(cdata_arith MM_pow)
+{
+  return ffi_arith(L);
+}
+
+LJLIB_CF(ffi_meta___unm)	LJLIB_REC(cdata_arith MM_unm)
+{
+  return ffi_arith(L);
+}
+
+LJLIB_CF(ffi_meta___bnot)	LJLIB_REC(cdata_arith MM_bnot)
 {
   return ffi_arith(L);
 }
