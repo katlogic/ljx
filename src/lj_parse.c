@@ -1,6 +1,6 @@
 /*
 ** Lua parser (source code -> bytecode).
-** Copyright (C) 2005-2015 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2016 Mike Pall. See Copyright Notice in luajit.h
 **
 ** Lua 5.2 port, variable resolution, closure lifting.
 ** Copyright (C) 2014 Karel Tuma. See Copyright Notice in luajit.h
