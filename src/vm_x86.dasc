@@ -3703,6 +3703,25 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     break;
 
   /* -- Binary ops -------------------------------------------------------- */
+#if !LJ_53
+  case BC_IDIV:
+  case BC_BAND:
+  case BC_BOR:
+  case BC_BXOR:
+  case BC_BSHL:
+  case BC_BSHR:
+  case BC_BNOT:
+    break;
+#else
+  case BC_IDIV:
+  case BC_BAND:
+  case BC_BOR:
+  case BC_BXOR:
+  case BC_BSHL:
+  case BC_BSHR:
+  case BC_BNOT:
+    break;
+#endif
 
     |.macro ins_arithpre, sseins, ssereg
     |  ins_ABC

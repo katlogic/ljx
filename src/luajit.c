@@ -21,6 +21,7 @@
 #include "luajit.h"
 
 #include "lj_arch.h"
+#include "lj_char.h"
 
 #include <unistd.h>
 
@@ -48,8 +49,8 @@ static const char *const lua_rl_keywords[] = {
 
 static int valididentifier(const char *s)
 {
-  if (!(isalpha(*s) || *s == '_')) return 0;
-  for (s++; *s; s++) if (!(isalpha(*s) || isdigit(*s) || *s == '_')) return 0;
+  if (!(isalpha((int)*s) || *s == '_')) return 0;
+  for (s++; *s; s++) if (!(isalpha((int)*s) || isdigit((int)*s) || *s == '_')) return 0;
   return 1;
 }
 
@@ -128,7 +129,7 @@ static char **lua_rl_complete(const char *text, int start, int end)
   size_t i, n, dot, loop;
   int savetop;
 
-  if (!(text[0] == '\0' || isalpha(text[0]) || text[0] == '_')) return NULL;
+  if (!(text[0] == '\0' || isalpha((int)text[0]) || text[0] == '_')) return NULL;
 
   ml.list = NULL;
   ml.idx = ml.allocated = ml.matchlen = 0;
@@ -801,7 +802,7 @@ static int pmain(lua_State *L)
     s->status = handle_luainit(L);
     if (s->status != 0) return 0;
   }
-  if ((flags & FLAGS_VERSION)) fputs(LUA_COPYRIGHTS "\n\nCredits:\n" LUA_CREDITS, stdout);
+  if ((flags & FLAGS_VERSION)) fputs(LUA_COPYRIGHTS, stdout);
   s->status = runargs(L, argv, (script > 0) ? script : s->argc);
   if (s->status != 0) return 0;
   if (script) {

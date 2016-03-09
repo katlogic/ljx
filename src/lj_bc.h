@@ -98,6 +98,15 @@
   _(UNM,	dst,	___,	var,	unm) \
   _(LEN,	dst,	___,	var,	len) \
   \
+  /* Bitwise ops. They don't (yet?) have the VN/NV/VV form. */ \
+  _(IDIV,	dst,	var,	var,	idiv) \
+  _(BAND,	dst,	var,	var,	band) \
+  _(BOR,	dst,	var,	var,	bor) \
+  _(BXOR,	dst,	var,	var,	bxor) \
+  _(BSHL,	dst,	var,	var,	bshl) \
+  _(BSHR,	dst,	var,	var,	bshr) \
+  _(BNOT,	dst,	___,	var,	bnot) \
+  \
   /* Binary ops. ORDER OPR. VV last, POW must be next. */ \
   _(ADDVN,	dst,	var,	num,	add) \
   _(SUBVN,	dst,	var,	num,	sub) \
