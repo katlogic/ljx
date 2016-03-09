@@ -29,10 +29,9 @@ local function parse_arg(arg)
   if arg[1] == "-o" then
     outfile = arg[2]
     if not outfile then usage(arg) end
-    table.remove(arg, 1)
-    table.remove(arg, 1)
+    arg = {table.unpack(arg, 3)}
   end
-  return outfile
+  return outfile, arg
 end
 
 local function read_files(names)
@@ -189,7 +188,8 @@ local function write_file(name, data)
   end
 end
 
-local outfile = parse_arg(arg)
+local outfile
+outfile, arg = parse_arg(arg)
 local src = read_files(arg)
 local defs = find_defs(src)
 local hdr = gen_header(defs)
