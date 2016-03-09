@@ -30,14 +30,14 @@
 
 #include "lua.h"
 
-#define LUAJIT_VERSION		"LuaJIT 2.1.0-beta2"
+#define LUAJIT_VERSION		"LuaJIT 2.1.0-beta2+LJX"
 #define LUAJIT_VERSION_NUM	20100  /* Version 2.1.0 = 02.01.00. */
 #define LUAJIT_VERSION_SYM	luaJIT_version_2_1_0_beta2
 #define LUAJIT_COPYRIGHT	"Copyright (C) 2005-2016 Mike Pall"
 #define LUAJIT_URL		"http://luajit.org/"
 
 /* Let it be known who is responsible for this bastardization */
-#define LJX_COPYRIGHT	"Copyright (C) 2014 Lua, LuaJIT and LJX authors"
+#define LJX_COPYRIGHT	"Copyright (C) 2014-2016 Lua, LuaJIT and LJX authors"
 #define LJX_URL		"http://lua.cz/"
 
 #define LUA_COPYRIGHTS  \
