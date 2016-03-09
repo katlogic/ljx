@@ -115,7 +115,7 @@ int lj_cconv_compatptr(CTState *cts, CType *d, CType *s, CTInfo flags)
 ** Note: This is only used by the interpreter and not optimized at all.
 ** The JIT compiler will do a much better job specializing for each case.
 */
-void lj_cconv_ct_ct(CTState *cts, CType *d, CType *s,
+int lj_cconv_ct_ct(CTState *cts, CType *d, CType *s,
 		    uint8_t *dp, uint8_t *sp, CTInfo flags)
 {
   CTSize dsize = d->size, ssize = s->size;
@@ -297,7 +297,7 @@ void lj_cconv_ct_ct(CTState *cts, CType *d, CType *s,
       CType *sc = ctype_child(cts, s);
       lj_cconv_ct_ct(cts, dc, sc, dp, sp, flags);
       lj_cconv_ct_ct(cts, dc, sc, dp + dc->size, sp + sc->size, flags);
-      return;
+      return 0;
     }
     goto copyval;  /* Otherwise this is easy. */
 
@@ -363,8 +363,11 @@ copyval:  /* Copy value. */
 
   default:
   err_conv:
-    cconv_err_conv(cts, d, s, flags);
+    if (!(flags & CCF_NOERROR))
+      cconv_err_conv(cts, d, s, flags);
+    return -1;
   }
+  return 0;
 }
 
 /* -- C type to TValue conversion ----------------------------------------- */

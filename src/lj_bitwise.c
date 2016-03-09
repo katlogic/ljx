@@ -13,6 +13,7 @@ static int get_arg(lua_State *L, cTValue *o, int64_t *res)
   TValue tmp;
 #if LJ_HASFFI
   CTypeID id = 0;
+  *res = 0;
   if (tviscdata(o)) {
     CTState *cts = ctype_cts(L);
     uint8_t *sp = (uint8_t *)cdataptr(cdataV(o));
@@ -29,8 +30,9 @@ static int get_arg(lua_State *L, cTValue *o, int64_t *res)
       id = CTID_UINT64;  /* Use uint64_t, since it has the highest rank. */
     else
       id = CTID_INT64;  /* Use int64_t, unless already set. */
-    lj_cconv_ct_ct(cts, ctype_get(cts, id), s,
-		   (uint8_t *)&res, sp, CCF_ARG(1)); /* TBD: report correct arg */
+    if (lj_cconv_ct_ct(cts, ctype_get(cts, id), s,
+		   (uint8_t *)res, sp, CCF_NOERROR) < 0)
+      return -1;
     return id;
   } else
 #endif

@@ -47,13 +47,14 @@ static LJ_AINLINE uint32_t cconv_idx(CTInfo info)
 #define CCF_FROMTV	0x00000002u
 #define CCF_SAME	0x00000004u
 #define CCF_IGNQUAL	0x00000008u
+#define CCF_NOERROR     0x00000010u
 
 #define CCF_ARG_SHIFT	8
 #define CCF_ARG(n)	((n) << CCF_ARG_SHIFT)
 #define CCF_GETARG(f)	((f) >> CCF_ARG_SHIFT)
 
 LJ_FUNC int lj_cconv_compatptr(CTState *cts, CType *d, CType *s, CTInfo flags);
-LJ_FUNC void lj_cconv_ct_ct(CTState *cts, CType *d, CType *s,
+LJ_FUNC int lj_cconv_ct_ct(CTState *cts, CType *d, CType *s,
 			    uint8_t *dp, uint8_t *sp, CTInfo flags);
 LJ_FUNC int lj_cconv_tv_ct(CTState *cts, CType *s, CTypeID sid,
 			   TValue *o, uint8_t *sp);
