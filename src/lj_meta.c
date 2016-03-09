@@ -218,14 +218,11 @@ TValue *lj_meta_arith(lua_State *L, TValue *ra, cTValue *rb, cTValue *rc,
   MMS mm = bcmode_mm(op);
   TValue tempb, tempc;
   cTValue *b, *c;
-#if !LJ_53
   if ((b = str2num(rb, &tempb)) != NULL &&
       (c = str2num(rc, &tempc)) != NULL) {  /* Try coercion first. */
     setnumV(ra, lj_vm_foldarith(numV(b), numV(c), (int)mm-MM_add));
     return NULL;
-  } else
-#endif
-  {
+  } else {
     cTValue *mo = lj_meta_lookup(L, rb, mm);
     if (tvisnil(mo)) {
       mo = lj_meta_lookup(L, rc, mm);
