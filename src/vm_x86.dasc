@@ -3970,7 +3970,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  cmp LFUNC:RB, [BASE-8] // set for all members sharing this _ENV uv
     |  jnz <1
     |2:
-    |  ins_refetch
+    |  ins_next
     break;
   case BC_USETV:
 #define TV2MARKOFS \
