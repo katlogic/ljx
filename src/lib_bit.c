@@ -88,7 +88,7 @@ LJLIB_ASM(bit_bswap)		LJLIB_REC(bit_unary IR_BSWAP)
 #endif
 }
 
-LJLIB_ASM(bit_lshift)		LJLIB_REC(bit_shift IR_BSHL)
+LJLIB_ASM(bit_lshift)		LJLIB_REC(bit_shift IR_BSHL) /* ORDER BITLIB BSHL */
 {
 #if LJ_HASFFI
   CTypeID id = 0, id2 = 0;
@@ -111,7 +111,7 @@ LJLIB_ASM_(bit_arshift)		LJLIB_REC(bit_shift IR_BSAR)
 LJLIB_ASM_(bit_rol)		LJLIB_REC(bit_shift IR_BROL)
 LJLIB_ASM_(bit_ror)		LJLIB_REC(bit_shift IR_BROR)
 
-LJLIB_ASM(bit_band)		LJLIB_REC(bit_nary IR_BAND)
+LJLIB_ASM(bit_band)		LJLIB_REC(bit_nary IR_BAND) /* ORDER BITLIB BAND */
 {
 #if LJ_HASFFI
   CTypeID id = 0;

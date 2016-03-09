@@ -154,13 +154,16 @@ typedef struct FuncState {
 
 /* Binary and unary operators. ORDER OPR */
 typedef enum BinOpr {
-  OPR_ADD, OPR_SUB, OPR_MUL, OPR_DIV, OPR_MOD, OPR_POW,  /* ORDER ARITH */
+  OPR_ADD, OPR_SUB, OPR_MUL, OPR_DIV, OPR_MOD, OPR_POW, /* ORDER ARITH */
+  OPR_IDIV, OPR_BAND, OPR_BOR, OPR_BXOR, OPR_BSHL, OPR_BSHR,
   OPR_CONCAT,
   OPR_NE, OPR_EQ,
   OPR_LT, OPR_GE, OPR_LE, OPR_GT,
   OPR_AND, OPR_OR,
   OPR_NOBINOPR
 } BinOpr;
+
+#define OPR_ARITH_LAST (OPR_CONCAT-1)
 
 LJ_STATIC_ASSERT((int)BC_ISGE-(int)BC_ISLT == (int)OPR_GE-(int)OPR_LT);
 LJ_STATIC_ASSERT((int)BC_ISLE-(int)BC_ISLT == (int)OPR_LE-(int)OPR_LT);
@@ -896,7 +899,7 @@ static void bcemit_binop_left(FuncState *fs, BinOpr op, ExpDesc *e)
 /* Emit binary operator. */
 static void bcemit_binop(FuncState *fs, BinOpr op, ExpDesc *e1, ExpDesc *e2)
 {
-  if (op <= OPR_POW) {
+  if (op <= OPR_ARITH_LAST) {
     bcemit_arith(fs, op, e1, e2);
   } else if (op == OPR_AND) {
     lua_assert(e1->t == NO_JMP);  /* List must be closed. */
@@ -2159,14 +2162,17 @@ static const struct {
   uint8_t left;		/* Left priority. */
   uint8_t right;	/* Right priority. */
 } priority[] = {
-  {6,6}, {6,6}, {7,7}, {7,7}, {7,7},	/* ADD SUB MUL DIV MOD */
-  {10,9}, {5,4},			/* POW CONCAT (right associative) */
+  /* ADD SUB MUL DIV MOD POW */
+  {10,10}, {10,10}, {11,11}, {11,11}, {11,11}, {14,13},
+  {11,11}, {6,6}, {4,4}, {5,5}, 	/* IDIV BAND BOR BXOR */
+  {7,7}, {7,7}, 			/* SHL SHR */
+  {9,8},				/* CONCAT (right associative) */
   {3,3}, {3,3},				/* EQ NE */
   {3,3}, {3,3}, {3,3}, {3,3},		/* LT GE GT LE */
   {2,2}, {1,1}				/* AND OR */
 };
 
-#define UNARY_PRIORITY		8  /* Priority for unary operators. */
+#define UNARY_PRIORITY		12  /* Priority for unary operators. */
 
 /* Forward declaration. */
 static BinOpr expr_binop(LexState *ls, ExpDesc *v, uint32_t limit);

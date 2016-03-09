@@ -576,8 +576,8 @@ enum {
   /* Only the above (fast) metamethods are negative cached (max. 8). */ \
   _(lt) _(le) _(concat) _(call) \
   /* The following must be in ORDER ARITH. */ \
-  _(add) _(sub) _(mul) _(mod) _(pow) _(div) _(idiv) _(band) _(bor) \
-  _(bxor) _(bshl) _(bshr) _(unm) _(bnot) \
+  _(bnot) _(unm) _(add) _(sub) _(mul) _(div) _(mod) \
+  _(pow) _(idiv) _(band) _(bor) _(bxor) _(bshl) _(bshr) \
   /* The following are used in the standard libraries. */ \
   _(metatable) _(tostring) MMDEF_FFI(_) MMDEF_PAIRS(_)
 
