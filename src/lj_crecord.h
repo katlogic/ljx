@@ -11,6 +11,7 @@
 #include "lj_ffrecord.h"
 
 #if LJ_HASJIT && LJ_HASFFI
+#include "lj_ctype.h"
 LJ_FUNC void LJ_FASTCALL recff_cdata_index(jit_State *J, RecordFFData *rd);
 LJ_FUNC void LJ_FASTCALL recff_cdata_call(jit_State *J, RecordFFData *rd);
 LJ_FUNC void LJ_FASTCALL recff_cdata_arith(jit_State *J, RecordFFData *rd);
@@ -34,6 +35,11 @@ LJ_FUNC int LJ_FASTCALL recff_bit64_shift(jit_State *J, RecordFFData *rd);
 LJ_FUNC TRef recff_bit64_tohex(jit_State *J, RecordFFData *rd, TRef hdr);
 
 LJ_FUNC void LJ_FASTCALL lj_crecord_tonumber(jit_State *J, RecordFFData *rd);
+
+/* Some helpers for external recorders. */
+LJ_FUNC CTypeID LJ_FASTCALL lj_crec_bit64_type(CTState *cts, cTValue *tv);
+LJ_FUNC TRef LJ_FASTCALL lj_crec_ct_tv(jit_State *J, CType *d, TRef dp,
+                                       TRef sp, cTValue *sval);
 #endif
 
 #endif

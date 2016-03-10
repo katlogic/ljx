@@ -425,7 +425,7 @@ TRef LJ_FASTCALL lj_opt_narrow_convert(jit_State *J)
 /* -- Narrowing of implicit conversions ----------------------------------- */
 
 /* Recursively strip overflow checks. */
-static TRef narrow_stripov(jit_State *J, TRef tr, int lastop, IRRef mode)
+TRef LJ_FASTCALL lj_opt_narrow_stripov(jit_State *J, TRef tr, int lastop, IRRef mode)
 {
   IRRef ref = tref_ref(tr);
   IRIns *ir = IR(ref);
@@ -436,8 +436,8 @@ static TRef narrow_stripov(jit_State *J, TRef tr, int lastop, IRRef mode)
       return TREF(bp->val, irt_t(IR(bp->val)->t));
     } else {
       IRRef op1 = ir->op1, op2 = ir->op2;  /* The IR may be reallocated. */
-      op1 = narrow_stripov(J, op1, lastop, mode);
-      op2 = narrow_stripov(J, op2, lastop, mode);
+      op1 = lj_opt_narrow_stripov(J, op1, lastop, mode);
+      op2 = lj_opt_narrow_stripov(J, op2, lastop, mode);
       tr = emitir(IRT(op - IR_ADDOV + IR_ADD,
 		      ((mode & IRCONV_DSTMASK) >> IRCONV_DSH)), op1, op2);
       narrow_bpc_set(J, ref, tref_ref(tr), mode);
@@ -476,7 +476,7 @@ TRef LJ_FASTCALL lj_opt_narrow_toint(jit_State *J, TRef tr)
   ** Undefined overflow semantics allow stripping of ADDOV, SUBOV and MULOV.
   ** Use IRCONV_TOBIT for the cache entries, since the semantics are the same.
   */
-  return narrow_stripov(J, tr, IR_MULOV, (IRT_INT<<5)|IRT_INT|IRCONV_TOBIT);
+  return lj_opt_narrow_stripov(J, tr, IR_MULOV, (IRT_INT<<5)|IRT_INT|IRCONV_TOBIT);
 }
 
 /* Narrow conversion to bitop operand (overflow wrapped). */
@@ -492,7 +492,7 @@ TRef LJ_FASTCALL lj_opt_narrow_tobit(jit_State *J, TRef tr)
   ** Wrapped overflow semantics allow stripping of ADDOV and SUBOV.
   ** MULOV cannot be stripped due to precision widening.
   */
-  return narrow_stripov(J, tr, IR_SUBOV, (IRT_INT<<5)|IRT_INT|IRCONV_TOBIT);
+  return lj_opt_narrow_stripov(J, tr, IR_SUBOV, (IRT_INT<<5)|IRT_INT|IRCONV_TOBIT);
 }
 
 #if LJ_HASFFI
@@ -503,7 +503,7 @@ TRef LJ_FASTCALL lj_opt_narrow_cindex(jit_State *J, TRef tr)
   if (tref_isnum(tr))
     return emitir(IRT(IR_CONV, IRT_INTP), tr, (IRT_INTP<<5)|IRT_NUM|IRCONV_ANY);
   /* Undefined overflow semantics allow stripping of ADDOV, SUBOV and MULOV. */
-  return narrow_stripov(J, tr, IR_MULOV,
+  return lj_opt_narrow_stripov(J, tr, IR_MULOV,
 			LJ_64 ? ((IRT_INTP<<5)|IRT_INT|IRCONV_SEXT) :
 				((IRT_INTP<<5)|IRT_INT|IRCONV_TOBIT));
 }
