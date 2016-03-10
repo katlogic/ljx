@@ -160,7 +160,7 @@ typedef struct luaL_Buffer {
 
 LUALIB_API void (luaL_buffinit) (lua_State *L, luaL_Buffer *B);
 LUALIB_API char *(luaL_prepbuffer) (luaL_Buffer *B);
-LUALIB_API char *(luaL_prepbuffersize) (luaL_Buffer *B, size_t size);
+LUALIB_API char *(luaL_prepbuffsize) (luaL_Buffer *B, size_t size);
 LUALIB_API void (luaL_addlstring) (luaL_Buffer *B, const char *s, size_t l);
 LUALIB_API void (luaL_addstring) (luaL_Buffer *B, const char *s);
 LUALIB_API void (luaL_addvalue) (luaL_Buffer *B);
