@@ -161,6 +161,8 @@ static void LJ_FASTCALL recff_nyi(jit_State *J, RecordFFData *rd)
 	case FF_jit_flush:
 	  break;  /* Don't stitch across special builtins. */
 	default:
+          if (!(J->flags & JIT_F_OPT_STITCH))
+            break;
 	  recff_stitch(J);  /* Use trace stitching. */
 	  rd->nres = -1;
 	  return;
