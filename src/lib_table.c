@@ -129,6 +129,25 @@ LJLIB_LUA(table_remove) /*
   end
 */
 
+LJLIB_LUA(table_move) /*
+  function(a1,f,e,t,a2)
+    CHECK_int(f)
+    CHECK_int(e)
+    CHECK_int(t)
+    CHECK_tab(a1)
+    a2 = a2 or a1
+    CHECK_tab(a2)
+    if e >= f then
+      local m, n, d = 0, e-f, 1
+      if t > f then m, n, d = n, m, -1 end
+      for i = m, n, d do
+        a2[t+i] = a1[f+i]
+      end
+    end
+    return a2
+  end
+*/
+
 LJLIB_CF(table_concat)		LJLIB_REC(.)
 {
   GCtab *t = lj_lib_checktab(L, 1);
@@ -294,11 +313,20 @@ static int luaopen_table_clear(lua_State *L)
 LUALIB_API int luaopen_table(lua_State *L)
 {
   LJ_LIB_REG(L, LUA_TABLIBNAME, table);
+
+  /* Ugh, this field juggling is messy. Because they live in different modules
+   * depending on version. LJLIB*LUA does not support conditionals,
+   * so that's another ugly duckling in the pack.
+   */
   lua_getglobal(L, "unpack");
   lua_setfield(L, -2, "unpack");
 #if !LJ_51
   lua_pushnil(L);
   lua_setglobal(L, "unpack");
+#endif
+#if !LJ_53
+  lua_pushnil(L);
+  lua_setfield(L, -2, "move");
 #endif
   lj_lib_prereg(L, LUA_TABLIBNAME ".new", luaopen_table_new, tabV(L->top-1));
   lj_lib_prereg(L, LUA_TABLIBNAME ".clear", luaopen_table_clear, tabV(L->top-1));
