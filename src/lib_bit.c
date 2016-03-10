@@ -168,9 +168,60 @@ LJLIB_CF(bit_tohex)		LJLIB_REC(.)
   return 1;
 }
 
+#if !LJ_51
+#if !defined(LUA_NBITS)
+#define LUA_NBITS	32
+#endif
+#define ALLONES		(~(((~(lua_Unsigned)0) << (LUA_NBITS - 1)) << 1))
+/* macro to trim extra bits */
+#define trim(x)		((x) & ALLONES)
+#define mask(n)		(~((ALLONES << 1) << ((n) - 1)))
+static int fieldargs (lua_State *L, int farg, int *width) {
+  int f = luaL_checkint(L, farg);
+  int w = luaL_optint(L, farg + 1, 1);
+  luaL_argcheck(L, 0 <= f, farg, "field cannot be negative");
+  luaL_argcheck(L, 0 < w, farg + 1, "width must be positive");
+  if (f + w > LUA_NBITS)
+    luaL_error(L, "trying to access non-existent bits");
+  *width = w;
+  return f;
+}
+LJLIB_CF(bit_extract)
+{
+  int w;
+  lua_Unsigned r = luaL_checkunsigned(L, 1);
+  int f = fieldargs(L, 2, &w);
+  r = (r >> f) & mask(w);
+  lua_pushunsigned(L, r);
+  return 1;
+}
+LJLIB_CF(bit_replace) {
+  int w;
+  lua_Unsigned r = luaL_checkunsigned(L, 1);
+  lua_Unsigned v = luaL_checkunsigned(L, 2);
+  int f = fieldargs(L, 3, &w);
+  int m = mask(w);
+  v &= m;  /* erase bits outside given width */
+  r = (r & ~(m << f)) | (v << f);
+  lua_pushunsigned(L, r);
+  return 1;
+}
+#endif
+
 /* ------------------------------------------------------------------------ */
 
 #include "lj_libdef.h"
+LUALIB_API int luaopen_bit32(lua_State *L)
+{
+#if !LJ_51
+  LJ_LIB_REG(L, LUA_BIT32LIBNAME, bit);
+#define RENAME(x,y) lua_getfield(L, -1, #x); lua_setfield(L, -2, #y);
+  RENAME(rol,lrotate);
+  RENAME(ror,rrotate);
+#undef RENAME
+  return 1;
+#endif
+}
 
 LUALIB_API int luaopen_bit(lua_State *L)
 {

@@ -28,6 +28,9 @@ static const luaL_Reg lj_lib_load[] = {
   { LUA_MATHLIBNAME,	luaopen_math },
   { LUA_DBLIBNAME,	luaopen_debug },
   { LUA_BITLIBNAME,	luaopen_bit },
+#if !LJ_51
+  { LUA_BIT32LIBNAME,	luaopen_bit32 },
+#endif
   { LUA_JITLIBNAME,	luaopen_jit },
   { NULL,		NULL }
 };

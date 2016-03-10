@@ -19,6 +19,7 @@
 #define LUA_LOADLIBNAME	"package"
 #define LUA_DBLIBNAME	"debug"
 #define LUA_BITLIBNAME	"bit"
+#define LUA_BIT32LIBNAME "bit32"
 #define LUA_JITLIBNAME	"jit"
 #define LUA_FFILIBNAME	"ffi"
 #define LUA_UTF8LIBNAME	"utf8"
@@ -32,6 +33,7 @@ LUALIB_API int luaopen_os(lua_State *L);
 LUALIB_API int luaopen_package(lua_State *L);
 LUALIB_API int luaopen_debug(lua_State *L);
 LUALIB_API int luaopen_bit(lua_State *L);
+LUALIB_API int luaopen_bit32(lua_State *L);
 LUALIB_API int luaopen_jit(lua_State *L);
 LUALIB_API int luaopen_ffi(lua_State *L);
 LUALIB_API int luaopen_utf8(lua_State *L);

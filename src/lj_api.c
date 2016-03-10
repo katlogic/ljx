@@ -532,6 +532,14 @@ LUALIB_API lua_Integer luaL_optinteger(lua_State *L, int idx, lua_Integer def)
 #endif
 }
 
+LUALIB_API lua_Unsigned luaL_checkunsigned (lua_State *L, int narg) {
+  int isnum;
+  lua_Unsigned d = lua_tounsignedx(L, narg, &isnum);
+  if (!isnum)
+    lj_err_argt(L, narg, LUA_TNUMBER);
+  return d;
+}
+
 /* TBD: check cast semantics */
 LUALIB_API lua_Unsigned luaL_optunsigned(lua_State *L, int idx, lua_Unsigned def)
 {
