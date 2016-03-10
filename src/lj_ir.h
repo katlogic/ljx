@@ -62,7 +62,7 @@
   _(POW,	N , ref, ref) \
   _(NEG,	N , ref, ___) \
   _(BNOT,	N , ref, ___) \
-  _(IDIV,	N , ref, ref) \
+  _(IDIV,	N , ref, ref) /* Dummy opcode, gets rewritten to IR_DIV. */ \
   _(BAND,	C , ref, ref) /* ORDER BITLIB BAND */ \
   _(BOR,	C , ref, ref) \
   _(BXOR,	C , ref, ref) \

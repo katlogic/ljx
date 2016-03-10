@@ -165,6 +165,8 @@ TRef lj_rec_bitwise(jit_State *J, TRef rb, TRef rc, cTValue *rbv, cTValue *rcv, 
 
   /* All set now. id1 holds the output type (or 0 if INT). */
   uint32_t irop = IR_BNOT + mm - MM_bnot;
+  if (mm == MM_idiv)
+    irop = IR_DIV;
   /* Type-specific and boxed? */
 #if LJ_HASJIT && LJ_HASFFI
   if (id1) {
