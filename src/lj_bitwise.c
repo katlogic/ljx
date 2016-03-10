@@ -1,4 +1,5 @@
-/* Lua 5.3 bitwise operators handling. Recording is in lj_record.c */
+/* Lua 5.3 bitwise operators handling. */
+
 #include "lj_obj.h"
 #include "lj_strscan.h"
 #if LJ_HASFFI
@@ -12,11 +13,7 @@
 #include "lj_iropt.h"
 
 #if LJ_53
-#define emitir(ot, a, b)	(lj_ir_set(J, (ot), (a), (b)), lj_opt_fold(J))
-#define emitconv(a, dt, st, flags) \
-  emitir(IRT(IR_CONV, (dt)), (a), (st)|((dt) << 5)|(flags))
-
-
+/* Decode arguments for interpreter dispatch */
 static int get_arg(lua_State *L, cTValue *o, int64_t *res)
 {
   TValue tmp;
@@ -105,6 +102,10 @@ int lj_vm_foldbit(lua_State *L, TValue *ra, cTValue *rb, cTValue *rc,
   return id1;
 }
 
+#define emitir(ot, a, b)	(lj_ir_set(J, (ot), (a), (b)), lj_opt_fold(J))
+#define emitconv(a, dt, st, flags) \
+  emitir(IRT(IR_CONV, (dt)), (a), (st)|((dt) << 5)|(flags))
+
 /* Same as lj_opt_narrow_tobit, but does not raise trace error. */
 static TRef bit_narrow_int(jit_State *J, TRef r)
 {
@@ -117,6 +118,7 @@ static TRef bit_narrow_int(jit_State *J, TRef r)
   return lj_opt_narrow_stripov(J, r, IR_SUBOV, (IRT_INT<<5)|IRT_INT|IRCONV_TOBIT);
 }
 
+/* Narrow to specified type. */
 static TRef bit_narrow_id(jit_State *J, CTypeID wantid, TRef tr, cTValue *o)
 {
   CTState *cts = ctype_ctsG(J2G(J));
@@ -129,6 +131,7 @@ static TRef bit_narrow_id(jit_State *J, CTypeID wantid, TRef tr, cTValue *o)
 #endif
 }
 
+/* Record. */
 TRef lj_rec_bitwise(jit_State *J, TRef rb, TRef rc, cTValue *rbv, cTValue *rcv, MMS mm)
 {
   CTState *cts = ctype_ctsG(J2G(J));
