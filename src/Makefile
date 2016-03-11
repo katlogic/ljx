@@ -110,21 +110,20 @@ XCFLAGS=
 # It will also report version as Lua 5.1 and ABI will match 5.1
 # When not defined, LJX is 5.2 ABI compatible. Grep code
 # for XABI to see differences between 5.1/5.2 ABI.
+#XCFLAGS+= -DLUAJIT_ENABLE_LUA51COMPAT
 #
-# XCFLAGS+= -DLUAJIT_ENABLE_LUA51COMPAT
-#
-# Features from Lua 5.3, notably integer support.
-# (work in progress)
+# Enable lua 5.3 features. Bitwise operators and some parts of standard
+# library.
 XCFLAGS+= -DLUAJIT_ENABLE_LUA53COMPAT
 #
-# This flag disables various kludges to emulate Lua Undefined/Underspecified
-# Behavior. Normally this is needed so buggy scripts continue to work,
-# but incurs small performance penalty. Think clang emulating gcc UBs
-# to make life easier.
-#XCFLAGS+= -DLUAJIT_DISABLE_UBKLUDGES
+# Support (up to) 4GB memory. This is accomplished by using OS-supplied
+# malloc(), instead of custom allocators. Note that the host process must
+# reside at low address, as heap which grows upwards directly follows it.
 #
-# Support 4GB memory on Linux AMD64. Note that host process
-# must not be compiled PIE on hardened systems, ie to build luajit REPL, use:
+# This means disabling ASLR on windows and linux. If no suitable memory layout
+# is detected, LJX will switch to the original, more controllable 2GB allocator.
+#
+# You can disable ASLR on windows with:
 # $ make TARGET_LDFLAGS=-fno-pie
 #XCFLAGS+=-DLUAJIT_ENABLE_4GB
 #
