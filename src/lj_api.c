@@ -1233,7 +1233,7 @@ LUA_API int lua_setfenv(lua_State *L, int idx)
   api_checknelems(L, 1);
   api_checkvalidindex(L, o);
   if (tvisudata(o)) {
-    api_check(L, tvisgc(L->top-1));
+    api_check(L, tvisgcv(L->top-1));
     setuservalue(L, udataV(o), L->top-1);
   } else {
     api_check(L, tvistab(L->top-1));
