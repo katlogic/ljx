@@ -33,7 +33,7 @@
 #include "lj_snap.h"
 #include "lj_dispatch.h"
 #include "lj_vm.h"
-#include "lj_bitwise.h"
+#include "ljx_bitwise.h"
 
 /* Some local macros to save typing. Undef'd at the end. */
 #define IR(ref)			(&J->cur.ir[(ref)])
@@ -2101,7 +2101,7 @@ void lj_record_ins(jit_State *J)
   case BC_SHR:
   {
     MMS opmm = bcmode_mm(op);
-    if (!(rc = lj_rec_bitwise(J, rb, rc, rbv, rcv, opmm)))
+    if (!(rc = ljx_rec_bitwise(J, rb, rc, rbv, rcv, opmm)))
       rc = rec_mm_arith(J, &ix, bcmode_mm(op));
     break;
   }

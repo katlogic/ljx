@@ -22,7 +22,7 @@
 #include "lj_strscan.h"
 #include "lj_strfmt.h"
 #include "lj_lib.h"
-#include "lj_bitwise.h"
+#include "ljx_bitwise.h"
 
 /* -- Metamethod handling ------------------------------------------------- */
 
@@ -221,7 +221,7 @@ TValue *lj_meta_arith(lua_State *L, TValue *ra, cTValue *rb, cTValue *rc,
   cTValue *b, *c;
 #if LJ_53
   if (mm >= MM_bnot) {
-    if (lj_vm_foldbit(L, ra, rb, rc, mm) < 0)
+    if (ljx_vm_foldbit(L, ra, rb, rc, mm) < 0)
       goto metacall;
     return NULL;
   }

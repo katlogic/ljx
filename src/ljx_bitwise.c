@@ -1,5 +1,3 @@
-/* Lua 5.3 bitwise operators handling. */
-
 #include "lj_obj.h"
 #include "lj_strscan.h"
 #if LJ_HASFFI
@@ -7,7 +5,7 @@
 #include "lj_cdata.h"
 #include "lj_cconv.h"
 #endif
-#include "lj_bitwise.h"
+#include "ljx_bitwise.h"
 #include "lj_crecord.h"
 #include "lj_dispatch.h"
 #include "lj_iropt.h"
@@ -64,7 +62,7 @@ _(bxor, ^=y) _(shl, <<=y) _(shr, >>=y)
 #define CASE(name, suff) \
   case MM_##name: x suff; break;
 
-int lj_vm_foldbit(lua_State *L, TValue *ra, cTValue *rb, cTValue *rc,
+int ljx_vm_foldbit(lua_State *L, TValue *ra, cTValue *rb, cTValue *rc,
 		      MMS mm)
 {
   int id1, id2;
@@ -132,7 +130,7 @@ static TRef bit_narrow_id(jit_State *J, CTypeID wantid, TRef tr, cTValue *o)
 }
 
 /* Record. */
-TRef lj_rec_bitwise(jit_State *J, TRef rb, TRef rc, cTValue *rbv, cTValue *rcv, MMS mm)
+TRef ljx_rec_bitwise(jit_State *J, TRef rb, TRef rc, cTValue *rbv, cTValue *rcv, MMS mm)
 {
   CTState *cts = ctype_ctsG(J2G(J));
   TRef r1, r2 = 0;
