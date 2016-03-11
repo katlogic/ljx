@@ -1247,8 +1247,7 @@ LUA_API int lua_setfenv(lua_State *L, int idx)
       return 0;
     }
   }
-  if (tvisgcv(L->top-1))
-    lj_gc_objbarrier(L, gcV(o), gcV(L->top-1));
+  lj_gc_objbarrier(L, gcV(o), gcV(L->top-1));
   L->top--;
   return 1;
 }
