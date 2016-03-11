@@ -224,6 +224,24 @@ static void LJ_FASTCALL recff_getmetatable(jit_State *J, RecordFFData *rd)
   }  /* else: Interpreter will throw. */
 }
 
+#if !LJ_51
+static void setmetatable_gc_guard(jit_State *J, RecordFFData *rd)
+{
+  RecordIndex mix;
+  GCstr *mmstr = mmname_str(J2G(J), MM_gc);
+
+  /* Look for __gc */
+  copyTV(J->L, &mix.tabv, &rd->argv[1]);
+  setstrV(J->L, &mix.keyv, mmstr);
+  mix.tab = J->base[1];
+  mix.key = lj_ir_kstr(J, mmstr);
+  mix.val = 0; /* Load */
+  mix.idxchain = 0;
+  if (!tref_isnil(lj_record_idx(J, &mix)))
+    lj_ir_call(J, IRCALL_lj_gc_tab_finalized, J->base[0]);
+}
+#endif
+
 static void LJ_FASTCALL recff_setmetatable(jit_State *J, RecordFFData *rd)
 {
   TRef tr = J->base[0];
@@ -237,8 +255,12 @@ static void LJ_FASTCALL recff_setmetatable(jit_State *J, RecordFFData *rd)
     fref = emitir(IRT(IR_FREF, IRT_P32), tr, IRFL_TAB_META);
     mtref = tref_isnil(mt) ? lj_ir_knull(J, IRT_TAB) : mt;
     emitir(IRT(IR_FSTORE, IRT_TAB), fref, mtref);
-    if (!tref_isnil(mt))
+    if (!tref_isnil(mt)) {
+#if !LJ_51
+      setmetatable_gc_guard(J, rd);
+#endif
       emitir(IRT(IR_TBAR, IRT_TAB), tr, 0);
+    }
     J->base[0] = tr;
     J->needsnap = 1;
   }  /* else: Interpreter will throw. */
@@ -1253,8 +1275,12 @@ static void LJ_FASTCALL recff_debug_setmetatable(jit_State *J, RecordFFData *rd)
     fref = emitir(IRT(IR_FREF, IRT_P32), tr, IRFL_TAB_META);
     mtref = tref_isnil(mt) ? lj_ir_knull(J, IRT_TAB) : mt;
     emitir(IRT(IR_FSTORE, IRT_TAB), fref, mtref);
-    if (!tref_isnil(mt))
+    if (!tref_isnil(mt)) {
       emitir(IRT(IR_TBAR, IRT_TAB), tr, 0);
+#if !LJ_51
+      setmetatable_gc_guard(J, rd);
+#endif
+    }
     J->base[0] = tr;
     J->needsnap = 1;
   } else {
