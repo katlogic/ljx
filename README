@@ -1,15 +1,11 @@
-LuaJIT experimental
--------------------
-Mostly 5.2 complete, with bits of 5.3.
-i386/x64 only (other archs are adhoc ported per demand)
+LuaJIT experimental 5.2/5.3 port
+--------------------------------
 
-No handholding, here be dragons ahead. This fork tracks Mike's bleeding
-edge repo, with lots of our own fragile hacks mixed in.
+* i386/x64 only (other archs adhoc, ported per demand)
+* Some C API calls may be still missing, the frequently used ones are all there
 
-There are no releases planned as of yet - development, testing, deployment all
-happens in rolling fashion from git head (with reverts to put out inevitable
-occasional fires). Users are expected to be capable of git bisect when asking
-for support.
+The code is not yet suitable for "long running" production. The changes made
+are substantial, there *will be* bugs - and not much testing has been done yet.
 
-Definitely not for the faint of the heart, especially if you're looking for
-"stable 5.2 Luajit" to ship with your product.
+Still, lot of smaller single-shot scripts written for 5.2/5.3 work as expected,
+and a bug in the interpreter can be usually easily spotted.
