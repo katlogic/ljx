@@ -1195,14 +1195,16 @@ LUA_API int lua_setmetatable(lua_State *L, int idx)
   if (tvistab(o)) {
     setgcref(tabV(o)->metatable, obj2gco(mt));
     if (mt) {
+#if !LJ_51
       if (lj_meta_fast(L, mt, MM_gc))
         lj_gc_tab_finalized(L, gcval(o));
+#endif
       lj_gc_objbarriert(L, tabV(o), mt);
     }
   } else if (tvisudata(o)) {
     setgcref(udataV(o)->metatable, obj2gco(mt));
     if (mt) {
-  /* Only 5.3 has ressurections */
+      /* Only 5.3 has ressurections */
 #if LJ_53
       if (lj_meta_fast(L, mt, MM_gc))
 	clearfinalized(gcval(o)); /* Resurrect. */

@@ -130,8 +130,10 @@ LJLIB_ASM(setmetatable)		LJLIB_REC(.)
     lj_err_caller(L, LJ_ERR_PROTMT);
   setgcref(t->metatable, obj2gco(mt));
   if (mt) { 
+#if !LJ_51
     if (lj_meta_fast(L, mt, MM_gc))
       lj_gc_tab_finalized(L, (GCobj*)t);
+#endif
     lj_gc_objbarriert(L, t, mt);
   }
   settabV(L, L->base-1-LJ_FR2, t);
