@@ -21,7 +21,12 @@ typedef struct FormatState {
 /* Format types (max. 16). */
 typedef enum FormatType {
   STRFMT_EOF, STRFMT_ERR, STRFMT_LIT,
-  STRFMT_INT, STRFMT_UINT, STRFMT_NUM, STRFMT_STR, STRFMT_CHAR, STRFMT_PTR
+  STRFMT_INT, STRFMT_UINT, STRFMT_NUM, STRFMT_STR, STRFMT_CHAR, STRFMT_PTR,
+#if LJ_53
+  STRFMT_UTF8
+#else
+  STRFMT_UTF8=0
+#endif
 } FormatType;
 
 /* Format subtypes (bits are reused). */
@@ -71,6 +76,7 @@ typedef enum FormatType {
 #define STRFMT_MAXBUF_INT	(1+10)  /* Sign + int32_t in decimal. */
 #define STRFMT_MAXBUF_NUM	32  /* Must correspond with STRFMT_G14. */
 #define STRFMT_MAXBUF_PTR	(2+2*sizeof(ptrdiff_t))  /* "0x" + hex ptr. */
+#define STRFMT_MAXBUF_UTF8      8
 
 /* Format parser. */
 LJ_FUNC SFormat LJ_FASTCALL lj_strfmt_parse(FormatState *fs);
@@ -87,6 +93,7 @@ LJ_FUNC char * LJ_FASTCALL lj_strfmt_wint(char *p, int32_t k);
 LJ_FUNC char * LJ_FASTCALL lj_strfmt_wptr(char *p, const void *v);
 LJ_FUNC char * LJ_FASTCALL lj_strfmt_wuleb128(char *p, uint32_t v);
 LJ_FUNC const char *lj_strfmt_wstrnum(lua_State *L, cTValue *o, MSize *lenp);
+LJ_FUNC MSize LJ_FASTCALL lj_strfmt_utf8(char *buff, unsigned long x);
 
 /* Unformatted conversions to buffer. */
 LJ_FUNC SBuf * LJ_FASTCALL lj_strfmt_putint(SBuf *sb, int32_t k);
@@ -95,6 +102,7 @@ LJ_FUNC SBuf * LJ_FASTCALL lj_strfmt_putnum(SBuf *sb, cTValue *o);
 #endif
 LJ_FUNC SBuf * LJ_FASTCALL lj_strfmt_putptr(SBuf *sb, const void *v);
 LJ_FUNC SBuf * LJ_FASTCALL lj_strfmt_putquoted(SBuf *sb, GCstr *str);
+LJ_FUNC SBuf * LJ_FASTCALL lj_strfmt_pututf8(SBuf *sb, long n);
 
 /* Formatted conversions to buffer. */
 LJ_FUNC SBuf *lj_strfmt_putfxint(SBuf *sb, SFormat sf, uint64_t k);

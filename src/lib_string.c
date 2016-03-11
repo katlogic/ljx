@@ -753,6 +753,11 @@ again:
       case STRFMT_PTR:  /* No formatting. */
 	lj_strfmt_putptr(sb, lj_obj_ptr(L->base+arg-1));
 	break;
+#if LJ_53
+      case STRFMT_UTF8:
+        lj_strfmt_pututf8(sb, lj_lib_checkint(L, arg));
+        break;
+#endif
       default:
 	lua_assert(0);
 	break;

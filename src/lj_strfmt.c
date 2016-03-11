@@ -19,7 +19,7 @@
 
 static const uint8_t strfmt_map[('x'-'A')+1] = {
   STRFMT_A,0,0,0,STRFMT_E,STRFMT_F,STRFMT_G,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,STRFMT_X,0,0,
+  0,0,0,0,0,0,0,STRFMT_UTF8,0,0,STRFMT_X,0,0,
   0,0,0,0,0,0,
   STRFMT_A,0,STRFMT_C,STRFMT_D,STRFMT_E,STRFMT_F,STRFMT_G,0,STRFMT_I,0,0,0,0,
   0,STRFMT_O,STRFMT_P,STRFMT_Q,0,STRFMT_S,0,STRFMT_U,0,0,STRFMT_X
@@ -168,8 +168,29 @@ const char *lj_strfmt_wstrnum(lua_State *L, cTValue *o, MSize *lenp)
   return sbufB(sb);
 }
 
-/* -- Unformatted conversions to buffer ----------------------------------- */
+#if LJ_53
+/* Format utf8 code into buff. Note that `buff` goes backwards. */
+MSize LJ_FASTCALL lj_strfmt_utf8(char *buff, unsigned long x)
+{
+  int n = 1;  /* number of bytes put in buffer (backwards) */
+  lua_assert(x <= 0x10FFFF);
+  if (x < 0x80)  /* ascii? */
+    buff[STRFMT_MAXBUF_UTF8 - 1] = (char)x;
+  else {  /* need continuation bytes */
+    unsigned int mfb = 0x3f;  /* maximum that fits in first byte */
+    do {  /* add continuation bytes */
+      buff[STRFMT_MAXBUF_UTF8 - (n++)] = (char)(0x80 | (x & 0x3f));
+      x >>= 6;  /* remove added bits */
+      mfb >>= 1;  /* now there is one less bit available in first byte */
+    } while (x > mfb);  /* still needs continuation byte? */
+    buff[STRFMT_MAXBUF_UTF8 - n] = (char)((~mfb << 1) | x);  /* add first byte */
+  }
+  return n;
+}
+#endif
 
+
+/* -- Unformatted conversions to buffer ----------------------------------- */
 /* Add integer to buffer. */
 SBuf * LJ_FASTCALL lj_strfmt_putint(SBuf *sb, int32_t k)
 {
@@ -395,6 +416,16 @@ GCstr * LJ_FASTCALL lj_strfmt_obj(lua_State *L, cTValue *o)
   }
 }
 
+#if LJ_53
+SBuf * LJ_FASTCALL lj_strfmt_pututf8(SBuf *sb, long n)
+{
+  char buff[STRFMT_MAXBUF_UTF8];
+  MSize l = lj_strfmt_utf8(buff, n);
+  lj_buf_putmem(sb, buff + STRFMT_MAXBUF_UTF8 - l, l);
+  return sb;
+}
+#endif
+
 /* -- Internal string formatting ------------------------------------------ */
 
 /*
@@ -406,6 +437,7 @@ GCstr * LJ_FASTCALL lj_strfmt_obj(lua_State *L, cTValue *o)
 ** - %d %u %o %x with full formatting, 32 bit integers only.
 ** - %f and other FP formats are really %.14g.
 ** - %s %c %p without formatting.
+** - %U - utf8
 */
 
 /* Push formatted message as a string object to Lua stack. va_list variant. */
@@ -442,6 +474,12 @@ const char *lj_strfmt_pushvf(lua_State *L, const char *fmt, va_list argp)
     case STRFMT_PTR:
       lj_strfmt_putptr(sb, va_arg(argp, void *));
       break;
+#if LJ_53
+    case STRFMT_UTF8: {
+      lj_strfmt_pututf8(sb, (long)va_arg(argp, long));
+      break;
+    }
+#endif
     case STRFMT_ERR:
     default:
       lj_buf_putb(sb, '?');
