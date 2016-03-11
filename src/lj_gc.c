@@ -63,7 +63,7 @@ static void gc_mark(global_State *g, GCobj *o)
     GCtab *mt = tabref(gco2ud(o)->metatable);
     gray2black(o);  /* Userdata are never gray. */
     if (mt) gc_markobj(g, mt);
-    gc_markobj(g, tabref(gco2ud(o)->env));
+    gc_markobj(g, gcref(gco2ud(o)->env));
   } else if (LJ_UNLIKELY(gct == ~LJ_TUPVAL)) {
     GCupval *uv = gco2uv(o);
     gc_marktv(g, uvval(uv));

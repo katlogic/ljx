@@ -980,7 +980,7 @@ LUA_API void lua_getfenv(lua_State *L, int idx)
   if (tvisfunc(o)) {
     settabV(L, L->top, tabref(funcV(o)->c.env));
   } else if (tvisudata(o)) {
-    settabV(L, L->top, tabref(udataV(o)->env));
+    getuservalue(L, udataV(o), L->top);
   } else if (tvisthread(o)) {
     settabV(L, L->top, tabref(threadV(o)->env));
   } else {
@@ -1232,30 +1232,37 @@ LUA_API int lua_setfenv(lua_State *L, int idx)
   GCtab *t;
   api_checknelems(L, 1);
   api_checkvalidindex(L, o);
-  api_check(L, tvistab(L->top-1));
-  t = tabV(L->top-1);
-  if (tvisfunc(o)) {
-    setgcref(funcV(o)->c.env, obj2gco(t));
-  } else if (tvisudata(o)) {
-    setgcref(udataV(o)->env, obj2gco(t));
-  } else if (tvisthread(o)) {
-    setgcref(threadV(o)->env, obj2gco(t));
+  if (tvisudata(o)) {
+    api_check(L, tvisgc(L->top-1));
+    setuservalue(L, udataV(o), L->top-1);
   } else {
-    L->top--;
-    return 0;
+    api_check(L, tvistab(L->top-1));
+    t = tabV(L->top-1);
+    if (tvisfunc(o)) {
+      setgcref(funcV(o)->c.env, obj2gco(t));
+    } else if (tvisthread(o)) {
+      setgcref(threadV(o)->env, obj2gco(t));
+    } else {
+      L->top--;
+      return 0;
+    }
   }
-  lj_gc_objbarrier(L, gcV(o), t);
+  if (tvisgcv(L->top-1))
+    lj_gc_objbarrier(L, gcV(o), gcV(L->top-1));
   L->top--;
   return 1;
 }
 
-/* Set user value for userdata or table. Tables can have any TValue
+/* Set user value for userdata or table. Any value can be
  * associated; not just tables like in Lua 5.2. */
 LUA_API void lua_setuservalue(lua_State *L, int idx)
 {
   if (lua_isuserdata(L, idx)) {
     lua_setfenv(L, idx);
   } else {
+    /* Tables don't have room for env field (occupied by array pointer instead).
+     * Introducing one would be wasteful - instead, we keep uservalues in a weak
+     * side-table. */
     api_checknelems(L, 1);
     api_check(L, lua_istable(L, idx));
     cTValue *o = index2adr(L, idx);

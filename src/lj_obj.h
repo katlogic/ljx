@@ -908,11 +908,10 @@ static LJ_AINLINE void setgcV(lua_State *L, TValue *o, GCobj *v, uint32_t it)
 }
 
 #define setuservalue(L,u,o) \
-  { const TValue *io=(o); GCudata *iu = (u); \
-  iu->env = io->it; io->envtt = io->tt; tvchecklive(L, io) }
+  { setgcref((u)->env, gcV(o)); (u)->envtt = ~itype(o); tvchecklive(L, (o)); }
 
 #define getuservalue(L,u,o) \
-  setgcV(L, o, gcref(u->env), ~u->envtt)
+  setgcV(L, (o), gcref((u)->env), ~(u)->envtt)
 
 
 #define define_setV(name, type, tag) \
