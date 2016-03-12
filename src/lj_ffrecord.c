@@ -840,14 +840,8 @@ static void LJ_FASTCALL recff_string_range(jit_State *J, RecordFFData *rd)
     emitir(IRTGI(IR_ULE), trend, trlen);
   } else {
     emitir(IRTGI(IR_UGT), trend, trlen);
-#if !LJ_51
-    /* Start behind end of the string? There will never be a match. */
-    J->base[0] = TREF_NIL;
-    return;
-#else
     end = (int32_t)str->len;
     trend = trlen;
-#endif
   }
   trstart = recff_string_start(J, str, &start, trstart, trlen, tr0);
   if (rd->data) {  /* Return string.sub result. */
