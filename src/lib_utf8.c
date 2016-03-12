@@ -1,6 +1,7 @@
 /*
-** $Id: lutf8lib.c,v 1.15 2015/03/28 19:16:55 roberto Exp $
 ** Standard library for UTF-8 manipulation
+**
+** Mostly taken verbatim from the Lua interpreter. 
 ** See Copyright Notice in lua.h
 */
 #define lib_utf8_c
@@ -236,12 +237,14 @@ LJLIB_CF(utf8_codes)
 }
 
 /* pattern to match a single UTF-8 character */
-LJLIB_PUSH("[\0-\x7F\xC2-\xF4][\x80-\xBF]*") LJLIB_SET(charpattern)
+#define CHARPATTERN "[\0-\x7F\xC2-\xF4][\x80-\xBF]*"
 
 #include "lj_libdef.h"
 
 LUALIB_API int luaopen_utf8 (lua_State *L) {
   LJ_LIB_REG(L, LUA_UTF8LIBNAME, utf8);
+  lua_pushliteral(L, CHARPATTERN);
+  lua_setfield(L, -2, "charpattern");
   return 1;
 }
 
