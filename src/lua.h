@@ -18,17 +18,25 @@
 
 #define LUA_VERSION_LJX         1
 #define LUA_VERSION_MAJOR       "5"
-#if LJ_53
-#define LUA_VERSION_MINOR       "3"
-#define LUA_VERSION_NUM         503
-#elif LJ_51
+
+#if LJ_51
 #define LUA_VERSION_MINOR       "1"
 #define LUA_VERSION_NUM         501
+#elif LJ_53
+#define LUA_VERSION_MINOR       "3"
+#define LUA_VERSION_NUM         503
 #else
 #define LUA_VERSION_MINOR       "2"
 #define LUA_VERSION_NUM         502
 #endif
-#define LUA_VERSION_RELEASE     "0"
+
+#if LJ_ABIVER==53
+#define LUA_ABIVER_STRING       "5.3"
+#elif LJ_ABIVER==52
+#define LUA_ABIVER_STRING       "5.2"
+#else
+#define LUA_ABIVER_STRING       "5.1"
+#endif
 
 #define LUA_VERSION     "Lua " LUA_VERSION_MAJOR "." LUA_VERSION_MINOR
 #define LUA_RELEASE     LUA_VERSION "." LUA_VERSION_RELEASE
@@ -48,29 +56,31 @@
 
 /*
 ** XABI: pseudo-indices
+** Those are carefuly laid out depending on ABI. Note that all indice
+** types are supported (ie you can use 5.1 indices with 5.3 ABI), but
+** then it will be only source compatible.
 */
-#if LJ_51
+#if LJ_ABIVER == 51
 #define LUAI_FIRSTPSEUDOIDX	(-10000)
 #define LUA_REGISTRYINDEX	(LUAI_FIRSTPSEUDOIDX)
 #define LUA_ENVIRONINDEX	(LUAI_FIRSTPSEUDOIDX-1)
 #define LUA_GLOBALSINDEX	(LUAI_FIRSTPSEUDOIDX-2)
-#else
-#define LUAI_FIRSTPSEUDOIDX	(-1000000 - 1000)
-#define LUA_REGISTRYINDEX       LUAI_FIRSTPSEUDOIDX
+#define LUA_UVINDEX             LUA_GLOBALSINDEX
+#else /* 5.2 and 5.3 */
+#define LUAI_FIRSTPSEUDOIDX	(-1000000 - 1000 + 3)
 #define LUA_ENVIRONINDEX        (LUAI_FIRSTPSEUDOIDX-1)
 #define LUA_GLOBALSINDEX        (LUAI_FIRSTPSEUDOIDX-2)
+#define LUA_REGISTRYINDEX       (LUAI_FIRSTPSEUDOIDX-3)
+#define LUA_UVINDEX             LUA_REGISTRYINDEX
 #endif
-#define LUA_UVINDEX             LUA_GLOBALSINDEX
 #define lua_upvalueindex(i)	(LUA_UVINDEX-(i))
 
-/* predefined values in the registry */
+/* 5.2/3: predefined values in the registry */
 #define LUA_RIDX_MAINTHREAD	1
 #define LUA_RIDX_GLOBALS	2
-#define LUA_RIDX_LAST		LUA_RIDX_GLOBALS /* XABI */
+#define LUA_RIDX_LAST		LUA_RIDX_GLOBALS
 #define LUA_RIDX_USERVAL        3 /* For lua_setuservalue(). */
 #define LUA_RIDX_COUNT          LUA_RIDX_USERVAL
-
-
 
 /* thread status; 0 is OK */
 #define LUA_OK          0
@@ -79,7 +89,7 @@
 #define LUA_ERRSYNTAX	3
 #define LUA_ERRMEM	4
 /* XABI */
-#if LJ_51
+#if LJ_ABIVER == 51
 #define LUA_ERRERR	5
 #else
 #define LUA_ERRGCMM	5
@@ -122,6 +132,8 @@ typedef void * (*lua_Alloc) (void *ud, void *ptr, size_t osize, size_t nsize);
 #define LUA_TFUNCTION		6
 #define LUA_TUSERDATA		7
 #define LUA_TTHREAD		8
+
+#define LUA_NUMTAGS             9
 
 /* minimum Lua stack available to a C function */
 #define LUA_MINSTACK	20
@@ -182,6 +194,41 @@ LUA_API int             (lua_iscfunction) (lua_State *L, int idx);
 LUA_API int             (lua_isuserdata) (lua_State *L, int idx);
 LUA_API int             (lua_type) (lua_State *L, int idx);
 LUA_API const char     *(lua_typename) (lua_State *L, int tp);
+
+/*
+** Comparison and arithmetic functions
+*/
+#define LUA_OPADD       0
+#define LUA_OPSUB       1
+#define LUA_OPMUL       2
+
+#if LJ_ABIVER==53
+#define LUA_OPMOD       3
+#define LUA_OPPOW       4
+#define LUA_OPDIV       5
+#define LUA_OPIDIV      6
+#define LUA_OPBAND      7
+#define LUA_OPBOR       8
+#define LUA_OPBXOR      9
+#define LUA_OPSHL       10
+#define LUA_OPSHR       11
+#define LUA_OPUNM       12
+#define LUA_OPBNOT      13
+#else /* 5.2, 5.1 */
+#define LUA_OPDIV       3
+#define LUA_OPMOD       4
+#define LUA_OPPOW       5
+#define LUA_OPUNM       6
+#define LUA_OPIDIV      7
+#define LUA_OPBAND      8
+#define LUA_OPBOR       9
+#define LUA_OPBXOR      10
+#define LUA_OPSHL       11
+#define LUA_OPSHR       12
+#define LUA_OPBNOT      13
+#endif
+
+LUA_API void  		(lua_arith) (lua_State *L, int op);
 
 #define LUA_OPEQ        0
 #define LUA_OPLT        1
@@ -245,7 +292,7 @@ LUA_API void  (lua_createtable) (lua_State *L, int narr, int nrec);
 LUA_API void *(lua_newuserdata) (lua_State *L, size_t sz);
 LUA_API int   (lua_getmetatable) (lua_State *L, int objindex);
 LUA_API void  (lua_getfenv) (lua_State *L, int idx);
-LUA_API void (lua_getuservalue) (lua_State *L, int idx);
+LUA_API int   (lua_getuservalue) (lua_State *L, int idx);
 
 
 /*
@@ -259,7 +306,8 @@ LUA_API void  (lua_rawsetp) (lua_State *L, int idx, const void *p);
 LUA_API int   (lua_setmetatable) (lua_State *L, int objindex);
 LUA_API int   (lua_setfenv) (lua_State *L, int idx);
 LUA_API void  (lua_setuservalue) (lua_State *L, int idx);
-#if LJ_51
+#if LJ_ABIVER==51
+/* Some users check for those macros */
 #define lua_setglobal(L,s)	lua_setfield(L, LUA_GLOBALSINDEX, (s))
 #define lua_getglobal(L,s)	lua_getfield(L, LUA_GLOBALSINDEX, (s))
 #else
@@ -279,8 +327,13 @@ LUA_API int   (lua_pcallk) (lua_State *L, int nargs, int nresults, int errfunc,
 LUA_API void  (lua_call) (lua_State *L, int nargs, int nresults);
 LUA_API int   (lua_pcall) (lua_State *L, int nargs, int nresults, int errfunc);
 LUA_API int   (lua_cpcall) (lua_State *L, lua_CFunction func, void *ud);
+#if LJ_ABIVER==51
 LUA_API int   (lua_load) (lua_State *L, lua_Reader reader, void *dt,
                                         const char *chunkname);
+#else
+LUA_API int   (lua_load) (lua_State *L, lua_Reader reader, void *dt,
+                                        const char *chunkname, const char *mode);
+#endif
 
 LUA_API int (lua_dump) (lua_State *L, lua_Writer writer, void *data);
 
@@ -306,7 +359,10 @@ LUA_API int  (lua_status) (lua_State *L);
 #define LUA_GCSTEP		5
 #define LUA_GCSETPAUSE		6
 #define LUA_GCSETSTEPMUL	7
+#define LUA_GCSETMAJORINC       8
 #define LUA_GCISRUNNING         9
+#define LUA_GCGEN               10
+#define LUA_GCINC               11
 
 LUA_API int (lua_gc) (lua_State *L, int what, int data);
 
@@ -395,6 +451,7 @@ LUA_API void lua_setlevel	(lua_State *from, lua_State *to);
 #define LUA_HOOKLINE	2
 #define LUA_HOOKCOUNT	3
 #define LUA_HOOKTAILRET 4
+#define LUA_HOOKTAILCALL 4
 
 
 /*
@@ -436,13 +493,25 @@ struct lua_Debug {
   const char *namewhat;	/* (n) `global', `local', `field', `method' */
   const char *what;	/* (S) `Lua', `C', `main', `tail' */
   const char *source;	/* (S) */
+#if LJ_ABIVER==51
   int currentline;	/* (l) */
   int nups;		/* (u) number of upvalues */
   int linedefined;	/* (S) */
   int lastlinedefined;	/* (S) */
   char short_src[LUA_IDSIZE]; /* (S) */
+  int i_ci;             /* active function */
+#else
+  int currentline;	/* (l) */
+  int linedefined;	/* (S) */
+  int lastlinedefined;	/* (S) */
+  unsigned char nups;	/* (u) number of upvalues */
+  unsigned char nparams;/* (u) number of parameters */
+  char isvararg;        /* (u) */
+  char istailcall;	/* (t) */
+  char short_src[LUA_IDSIZE]; /* (S) */
   /* private part */
   int i_ci;  /* active function */
+#endif
 };
 
 /* }====================================================================== */

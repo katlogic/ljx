@@ -755,7 +755,7 @@ LUALIB_API int luaopen_jit(lua_State *L)
   lua_pushliteral(L, LJ_OS_NAME);
   lua_pushliteral(L, LJ_ARCH_NAME);
   lua_pushinteger(L, LUAJIT_VERSION_NUM);
-  lua_pushliteral(L, LUAJIT_VERSION);
+  lua_pushliteral(L, LJ_LJX_VERSION);
   LJ_LIB_REG(L, LUA_JITLIBNAME, jit);
 #if LJ_HASPROFILE
   lj_lib_prereg(L, LUA_JITLIBNAME ".profile", luaopen_jit_profile,

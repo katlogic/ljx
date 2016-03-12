@@ -569,7 +569,27 @@ enum {
 #define MMDEF_FFI(_)
 #endif
 
+#if LJ_51 && !LJ_HASFFI
+#define MMDEF_PAIRS(_)
+#define MMDEF_PAIRS(_)
+#define MM_pairs        255
+#define MM_ipairs       255
+#else
 #define MMDEF_PAIRS(_) _(pairs) _(ipairs)
+#endif
+
+#if LJ_53
+#define MMDEF_BITWISE(_)  _(bnot) _(idiv) _(band) _(bor) _(bxor) _(shl) _(shr)
+#else
+#define MMDEF_BITWISE(_)
+#define MM_bnot         255
+#define MM_idiv         255
+#define MM_band         255
+#define MM_bor          255
+#define MM_bxor         255
+#define MM_shl          255
+#define MM_shr          255
+#endif
 
 #define MMDEF(_) \
   _(index) _(newindex) _(gc) _(mode) _(eq) _(len) \
@@ -577,7 +597,7 @@ enum {
   _(lt) _(le) _(concat) _(call) \
   /* The following must be in ORDER ARITH. */ \
   _(add) _(sub) _(mul) _(div) _(mod) _(pow) _(unm) \
-  _(bnot) _(idiv) _(band) _(bor) _(bxor) _(shl) _(shr) \
+  MMDEF_BITWISE(_) \
   /* The following are used in the standard libraries. */ \
   _(metatable) _(tostring) MMDEF_FFI(_) MMDEF_PAIRS(_)
 

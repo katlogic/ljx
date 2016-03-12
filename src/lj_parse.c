@@ -155,8 +155,10 @@ typedef struct FuncState {
 /* Binary and unary operators. ORDER OPR */
 typedef enum BinOpr {
   OPR_ADD, OPR_SUB, OPR_MUL, OPR_DIV, OPR_MOD, OPR_POW,
+#if LJ_53
   OPR_DUMMY1, OPR_DUMMY2, /* ORDER ARITH */
   OPR_IDIV, OPR_BAND, OPR_BOR, OPR_BXOR, OPR_SHL, OPR_SHR,
+#endif
   OPR_CONCAT,
   OPR_NE, OPR_EQ,
   OPR_LT, OPR_GE, OPR_LE, OPR_GT,
@@ -803,7 +805,7 @@ static void bcemit_arith(FuncState *fs, BinOpr opr, ExpDesc *e1, ExpDesc *e2)
 {
   BCReg rb, rc, t;
   uint32_t op;
-  if ((opr < OPR_IDIV) && foldarith(opr, e1, e2))
+  if ((opr < OPR_POW) && foldarith(opr, e1, e2))
     return;
   if (opr == OPR_POW) {
     op = BC_POW;
@@ -1039,7 +1041,7 @@ static void lex_match(LexState *ls, LexToken what, LexToken who, BCLine line)
 static GCstr *lex_str(LexState *ls)
 {
   GCstr *s;
-  if (ls->tok != TK_name)
+  if (ls->tok != TK_name && ((!LJ_51) || ls->tok != TK_goto))
     err_token(ls, TK_name);
   s = strV(&ls->tokval);
   lj_lex_next(ls);
@@ -1838,7 +1840,7 @@ static void expr_table(LexState *ls, ExpDesc *e)
       if (!expr_isk(&key)) expr_index(fs, e, &key);
       if (expr_isnumk(&key) && expr_numiszero(&key)) needarr = 1; else nhash++;
       lex_check(ls, '=');
-    } else if ((ls->tok == TK_name) &&
+    } else if ((ls->tok == TK_name || (LJ_51 && ls->tok == TK_goto)) &&
 	       lj_lex_lookahead(ls) == '=') {
       expr_str(ls, &key);
       lex_check(ls, '=');
@@ -1933,7 +1935,7 @@ static BCReg parse_params(LexState *ls, int needself)
     var_new_lit(ls, nparams++, "self");
   if (ls->tok != ')') {
     do {
-      if (ls->tok == TK_name) {
+      if (ls->tok == TK_name || (LJ_51 && ls->tok == TK_goto)) {
 	var_new(ls, nparams++, lex_str(ls));
       } else if (ls->tok == TK_dots) {
 	lj_lex_next(ls);
@@ -2013,6 +2015,10 @@ static void parse_args(LexState *ls, ExpDesc *e)
   BCReg base;
   BCLine line = ls->linenumber;
   if (ls->tok == '(') {
+#if LJ_51
+    if (line != ls->lastline)
+      err_syntax(ls, LJ_ERR_XAMBIG);
+#endif
     lj_lex_next(ls);
     if (ls->tok == ')') {  /* f(). */
       args.k = VVOID;
@@ -2058,7 +2064,7 @@ static void expr_primary(LexState *ls, ExpDesc *v)
     expr(ls, v);
     lex_match(ls, ')', '(', line);
     expr_discharge(ls->fs, v);
-  } else if (ls->tok == TK_name) {
+  } else if (ls->tok == TK_name || (LJ_51 && ls->tok == TK_goto)) {
     var_lookup(ls, v);
   } else {
     err_syntax(ls, LJ_ERR_XSYMBOL);
@@ -2179,9 +2185,11 @@ static const struct {
 } priority[] = {
   /* ADD SUB MUL DIV MOD POW */
   {10,10}, {10,10}, {11,11}, {11,11}, {11,11}, {14,13},
+#if LJ_53
   {0,0},{0,0}, /* dummy */
   {11,11}, {6,6}, {4,4}, {5,5}, 	/* IDIV BAND BOR BXOR */
   {7,7}, {7,7}, 			/* SHL SHR */
+#endif
   {9,8},				/* CONCAT (right associative) */
   {3,3}, {3,3},				/* EQ NE */
   {3,3}, {3,3}, {3,3}, {3,3},		/* LT GE GT LE */
@@ -2513,7 +2521,7 @@ static void parse_label(LexState *ls)
       synlevel_begin(ls);
       parse_label(ls);
       synlevel_end(ls);
-    } else if (ls->tok == ';') {
+    } else if (!LJ_51 && ls->tok == ';') {
       lj_lex_next(ls);
     } else {
       break;
@@ -2790,15 +2798,17 @@ static int parse_stmt(LexState *ls)
   case TK_break:
     lj_lex_next(ls);
     parse_break(ls);
-    return 0;
+    return LJ_51;
+#if !LJ_51
   case ';':
     lj_lex_next(ls);
     break;
+#endif
   case TK_label:
     parse_label(ls);
     break;
   case TK_goto:
-    if (lj_lex_lookahead(ls) == TK_name) {
+    if (!LJ_51 || lj_lex_lookahead(ls) == TK_name) {
       lj_lex_next(ls);
       parse_goto(ls);
       break;

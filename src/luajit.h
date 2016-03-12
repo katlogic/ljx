@@ -1,7 +1,9 @@
 /*
 ** LuaJIT -- a Just-In-Time Compiler for Lua. http://luajit.org/
-**
 ** Copyright (C) 2005-2016 Mike Pall. All rights reserved.
+**
+** LJX - a bastardization of LuaJIT
+** Copyright (C) 2014-2016 Karel Tuma, kat@lua.cz
 **
 ** Permission is hereby granted, free of charge, to any person obtaining
 ** a copy of this software and associated documentation files (the
@@ -23,14 +25,35 @@
 ** SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 **
 ** [ MIT license: http://www.opensource.org/licenses/mit-license.php ]
-*/
+**/
 
 #ifndef _LUAJIT_H
 #define _LUAJIT_H
 
+#define MIT_LEGALESE \
+"Permission is hereby granted, free of charge, to any person obtaining a copy\n" \
+"of this software and associated documentation files (the \"Software\"), to deal\n" \
+"in the Software without restriction, including without limitation the rights\n" \
+"to use, copy, modify, merge, publish, distribute, sublicense, and/or sell\n" \
+"copies of the Software, and to permit persons to whom the Software is\n" \
+"furnished to do so, subject to the following conditions:\n" \
+"\n" \
+"The above copyright notice and this permission notice shall be included in\n" \
+"all copies or substantial portions of the Software.\n" \
+"\n" \
+"THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\n" \
+"IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\n" \
+"FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE\n" \
+"AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\n" \
+"LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\n" \
+"OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN\n" \
+"THE SOFTWARE.\n"
+
+
 #include "lua.h"
 
-#define LUAJIT_VERSION		"LuaJIT 2.1.0-beta2+" LJX_VERSION
+#define LUAJIT_VERSION		"LuaJIT 2.1.0-beta2"
+#define LJ_LJX_VERSION          LUAJIT_VERSION "+" LJX_VERSION
 #define LUAJIT_VERSION_NUM	20100  /* Version 2.1.0 = 02.01.00. */
 #define LUAJIT_VERSION_SYM	luaJIT_version_2_1_0_beta2
 #define LUAJIT_COPYRIGHT	"Copyright (C) 2005-2016 Mike Pall"
@@ -43,7 +66,8 @@
 #define LUA_COPYRIGHTS  \
   LUA_VERSION " -- " LUA_COPYRIGHT " -- " LUA_URL "\n" \
   LUAJIT_VERSION " -- " LUAJIT_COPYRIGHT " -- " LUAJIT_URL "\n" \
-  LJX_VERSION " -- " LJX_COPYRIGHT " -- " LJX_URL
+  LJX_VERSION " -- " LJX_COPYRIGHT " -- " LJX_URL "\n\n" \
+  MIT_LEGALESE
 
 
 /* Modes for luaJIT_setmode. */

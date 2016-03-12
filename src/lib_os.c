@@ -50,9 +50,13 @@ LJLIB_CF(os_execute)
 #else
   const char *cmd = luaL_optstring(L, 1, NULL);
   int stat = system(cmd);
+#if !LJ_51
   if (cmd)
     return luaL_execresult(L, stat);
   setboolV(L->top++, 1);
+#else
+  setintV(L->top++, stat);
+#endif
   return 1;
 #endif
 }

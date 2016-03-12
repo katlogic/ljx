@@ -32,10 +32,6 @@ static const char *const tokennames[] = {
 #define TKSTR1(name)		#name,
 #define TKSTR2(name, sym)	#sym,
 TKDEF(TKSTR1, TKSTR2)
-#if LJ_53
-TKDEF53(TKSTR1, TKSTR2)
-#endif
-TKDEF2(TKSTR1, TKSTR2)
 #undef TKSTR1
 #undef TKSTR2
   NULL

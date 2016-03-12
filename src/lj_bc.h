@@ -68,6 +68,20 @@
 ** B = unsigned byte literal
 ** M = multiple args/results
 */
+#if LJ_53
+#define BCDEF_BITWISE(_) \
+  /* Bitwise ops. They don't (yet?) have the VN/NV/VV form. */ \
+  _(IDIV,	dst,	var,	var,	idiv) \
+  _(BAND,	dst,	var,	var,	band) \
+  _(BOR,	dst,	var,	var,	bor) \
+  _(BXOR,	dst,	var,	var,	bxor) \
+  _(SHL,	dst,	var,	var,	shl) \
+  _(SHR,	dst,	var,	var,	shr) \
+  _(BNOT,	dst,	___,	var,	bnot)
+#else
+#define BCDEF_BITWISE(_)
+#endif
+
 #define BCDEF(_) \
   /* Comparison ops. ORDER OPR. */ \
   _(ISLT,	var,	___,	var,	lt) \
@@ -98,14 +112,7 @@
   _(UNM,	dst,	___,	var,	unm) \
   _(LEN,	dst,	___,	var,	len) \
   \
-  /* Bitwise ops. They don't (yet?) have the VN/NV/VV form. */ \
-  _(IDIV,	dst,	var,	var,	idiv) \
-  _(BAND,	dst,	var,	var,	band) \
-  _(BOR,	dst,	var,	var,	bor) \
-  _(BXOR,	dst,	var,	var,	bxor) \
-  _(SHL,	dst,	var,	var,	shl) \
-  _(SHR,	dst,	var,	var,	shr) \
-  _(BNOT,	dst,	___,	var,	bnot) \
+  BCDEF_BITWISE(_) \
   \
   /* Binary ops. ORDER OPR. VV last, POW must be next. */ \
   _(ADDVN,	dst,	var,	num,	add) \

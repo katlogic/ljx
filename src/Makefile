@@ -1,21 +1,61 @@
-##############################################################################
-# LuaJIT Makefile. Requires GNU Make.
-#
-# Please read doc/install.html before changing any variables!
-#
-# Suitable for POSIX platforms (Linux, *BSD, OSX etc.).
-# Also works with MinGW and Cygwin on Windows.
-# Please check msvcbuild.bat for building with MSVC on Windows.
-#
-# Copyright (C) 2005-2016 Mike Pall. See Copyright Notice in luajit.h
-##############################################################################
-
+# Shortcut to enable common debug flags and verbose echo of Makefile steps
+# better just use `make DEBUG=1`
+#DEBUG=1
 VERSION:=$(shell git describe 2> /dev/null || cat ../.version)
-ABIVER=  5.2
-NODOTABIVER= 52
 
-# shortcut to enable common debug flags
-# DEBUG=1
+################################################################################
+# The C ABI to be compatible with. Legal values are 5.1/5.2/5.3
+#
+# Note that this switch does not influence the version reported, nor how
+# Lua actually behaves - it is only for C API binary compatibility
+# (as in "drop in DLL replacement"). This way, you can still have 5.3 lua
+# in something expecting Lua 5.1 on binary level.
+#
+# Additionaly, C API features of all Lua versions are still available despite
+# having lower version ABI (though inevitably, those will be compatible on
+# source level only). It is also possible to do the opposite thing - use 5.3 ABI,
+# and compile modules expecting 5.1-like header.
+#
+# See ENABLE_LUA5XCOMPAT to actually enforce particular version of the language.
+ABIVER=  5.1
+NODOTABIVER= 51
+################################################################################
+
+XCFLAGS= #This variable collects varios options below
+
+################################################################################
+# By default, LJX behaves mostly as Lua 5.2, and also reports as that version.
+#
+# Where there is no direct conflict, 5.1 and 5.2 features are mixed. For
+# example setfenv() and _ENV are fully cross-compatible. In case of conflicting
+# semantics, 5.2 is favored over 5.1.
+#
+# This is not always desirable, though. If you enable LUA51COMPAT, it will
+# unconditionally disable 5.2/5.3 features (such as _ENV, __pairs and __gc)
+# which can conflict with Lua 5.1 code. It will also report _VERSION as Lua 5.1.
+#
+# This will make LJX behave pretty much like stock LuaJIT.
+#XCFLAGS+= -DLUAJIT_ENABLE_LUA51COMPAT
+################################################################################
+
+################################################################################
+# Enable Lua 5.3 features. Bitwise operators and some parts of standard
+# library. Will report _VERSION as 5.3
+XCFLAGS+= -DLUAJIT_ENABLE_LUA53COMPAT
+################################################################################
+
+################################################################################
+# WIP, NOT WORKING, DONT USE
+# Support (up to) 4GB memory. This is accomplished by using OS-supplied
+# malloc(), instead of custom allocators. Note that the host process must
+# reside at low address, as heap which grows upwards directly follows it.
+#
+# This means disabling ASLR on windows and linux. If no suitable memory layout
+# is detected, LJX will switch to the original, more controllable 2GB allocator.
+# You can disable ASLR on windows with:
+# $ make TARGET_LDFLAGS=-fno-pie
+#XCFLAGS+=-DLUAJIT_ENABLE_4GB
+################################################################################
 
 ##############################################################################
 #############################  COMPILER OPTIONS  #############################
@@ -94,38 +134,12 @@ BUILDMODE= mixed
 ##############################################################################
 # Enable/disable these features as needed, but make sure you force a full
 # recompile with "make clean", followed by "make".
-XCFLAGS=
 #
 # Permanently disable the FFI extension to reduce the size of the LuaJIT
 # executable. But please consider that the FFI library is compiled-in,
 # but NOT loaded by default. It only allocates any memory, if you actually
 # make use of it.
 #XCFLAGS+= -DLUAJIT_DISABLE_FFI
-#
-# Features from Lua 5.1 that are unlikely to break existing code are
-# enabled by default. Some other features that *might* break existing
-# code (e.g. __pairs or os.execute() return values) can be enabled
-# by this switch, making it behave pretty much like stock LuaJIT.
-#
-# It will also report version as Lua 5.1 and ABI will match 5.1
-# When not defined, LJX is 5.2 ABI compatible. Grep code
-# for XABI to see differences between 5.1/5.2 ABI.
-#XCFLAGS+= -DLUAJIT_ENABLE_LUA51COMPAT
-#
-# Enable lua 5.3 features. Bitwise operators and some parts of standard
-# library.
-XCFLAGS+= -DLUAJIT_ENABLE_LUA53COMPAT
-#
-# Support (up to) 4GB memory. This is accomplished by using OS-supplied
-# malloc(), instead of custom allocators. Note that the host process must
-# reside at low address, as heap which grows upwards directly follows it.
-#
-# This means disabling ASLR on windows and linux. If no suitable memory layout
-# is detected, LJX will switch to the original, more controllable 2GB allocator.
-#
-# You can disable ASLR on windows with:
-# $ make TARGET_LDFLAGS=-fno-pie
-#XCFLAGS+=-DLUAJIT_ENABLE_4GB
 #
 # Disable the JIT compiler, i.e. turn LuaJIT into a pure interpreter.
 #XCFLAGS+= -DLUAJIT_DISABLE_JIT
@@ -260,7 +274,7 @@ TARGET_XSHLDFLAGS= -shared -fPIC -Wl,-soname,$(TARGET_SONAME)
 TARGET_DYNXLDOPTS=
 
 TARGET_LFSFLAGS= -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE
-TARGET_XCFLAGS= $(TARGET_LFSFLAGS) -U_FORTIFY_SOURCE
+TARGET_XCFLAGS= $(TARGET_LFSFLAGS) -DLJ_ABIVER=$(NODOTABIVER) -U_FORTIFY_SOURCE
 TARGET_XLDFLAGS=
 TARGET_XLIBS= -lm
 TARGET_XTLIBS=
@@ -715,7 +729,7 @@ lj_folddef.h: $(BUILDVM_T) lj_opt_fold.c
 
 lj_arch.h.dist: lj_arch.h
 	$(E) "ARCH      $@"
-	$(Q)$(CC) -dM -E lj_arch.h $(HOST_ACFLAGS) | egrep '#define (LUAJIT_|LJ_)' > lj_arch.h.dist
+	$(Q)$(CC) -dM -E lj_arch.h $(TARGET_ACFLAGS) | egrep '#define (LUAJIT_|LJ_)' > lj_arch.h.dist
 
 ##############################################################################
 # Object file rules.

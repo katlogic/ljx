@@ -105,8 +105,12 @@ static int io_file_close(lua_State *L, IOFileUD *iof)
     lua_assert(0);
     return 0;
 #endif
+#if LJ_51
+    ok = (stat != -1);
+#else
     iof->fp = NULL;
     return luaL_execresult(L, stat);
+#endif
   } else {
     lua_assert((iof->type & IOFILE_TYPE_MASK) == IOFILE_TYPE_STDF);
     setnilV(L->top++);
@@ -234,7 +238,7 @@ static int io_file_write(lua_State *L, FILE *fp, int start)
       lj_err_argt(L, (int)(tv - L->base) + 1, LUA_TSTRING);
     status = status && (fwrite(p, 1, len, fp) == len);
   }
-  if (status) {
+  if (!LJ_51 && status) {
     L->top = L->base+1;
     if (start == 0)
       setudataV(L, L->base, IOSTDF_UD(L, GCROOT_IO_OUTPUT));

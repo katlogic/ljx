@@ -43,6 +43,9 @@ LJLIB_CF(debug_setmetatable)    LJLIB_REC(.)
   lj_lib_checktabornil(L, 2);
   L->top = L->base+2;
   lua_setmetatable(L, 1);
+#if LJ_51
+  setboolV(L->top-1, 1);
+#endif
   return 1;
 }
 
@@ -253,28 +256,26 @@ LJLIB_CF(debug_upvaluejoin)
   return 0;
 }
 
+#if !LJ_51
 LJLIB_CF(debug_getuservalue)
 {
-  TValue *o = L->base;
-  if (o < L->top && tvisudata(o))
-    settabV(L, o, tabref(udataV(o)->env));
-  else
-    setnilV(o);
-  L->top = o+1;
+  if (L->base < L->top)
+    lua_getuservalue(L, 1);
   return 1;
 }
 
 LJLIB_CF(debug_setuservalue)
 {
   TValue *o = L->base;
-  if (!(o < L->top && tvisudata(o)))
+  if (!(o < L->top && (tvisudata(o)||tvistab(o))))
     lj_err_argt(L, 1, LUA_TUSERDATA);
   if (!(o+1 < L->top && tvistab(o+1)))
     lj_err_argt(L, 2, LUA_TTABLE);
   L->top = o+2;
-  lua_setfenv(L, 1);
+  lua_setuservalue(L, 1);
   return 1;
 }
+#endif
 
 /* ------------------------------------------------------------------------ */
 

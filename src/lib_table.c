@@ -266,6 +266,7 @@ LJLIB_CF(table_sort)
   return 0;
 }
 
+#if !LJ_51
 LJLIB_PUSH("n")
 LJLIB_CF(table_pack)
 {
@@ -281,6 +282,7 @@ LJLIB_CF(table_pack)
   lj_gc_check(L);
   return 1;
 }
+#endif
 
 LJLIB_NOREG LJLIB_CF(table_new)		LJLIB_REC(.)
 {
@@ -318,9 +320,11 @@ LUALIB_API int luaopen_table(lua_State *L)
    * depending on version. LJLIB*LUA does not support conditionals,
    * so that's another ugly duckling in the pack.
    */
+#if !LJ_51
   lua_getglobal(L, "unpack");
   lua_setfield(L, -2, "unpack");
-#if !LJ_51
+#endif
+#if 0
   lua_pushnil(L);
   lua_setglobal(L, "unpack");
 #endif

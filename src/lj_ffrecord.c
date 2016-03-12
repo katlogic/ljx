@@ -302,6 +302,7 @@ static void LJ_FASTCALL recff_rawequal(jit_State *J, RecordFFData *rd)
   }  /* else: Interpreter will throw. */
 }
 
+#if !LJ_51
 static void LJ_FASTCALL recff_rawlen(jit_State *J, RecordFFData *rd)
 {
   TRef tr = J->base[0];
@@ -312,6 +313,7 @@ static void LJ_FASTCALL recff_rawlen(jit_State *J, RecordFFData *rd)
   /* else: Interpreter will throw. */
   UNUSED(rd);
 }
+#endif
 
 /* Determine mode of select() call. */
 int32_t lj_ffrecord_select_mode(jit_State *J, TRef tr, TValue *tv)
@@ -838,8 +840,14 @@ static void LJ_FASTCALL recff_string_range(jit_State *J, RecordFFData *rd)
     emitir(IRTGI(IR_ULE), trend, trlen);
   } else {
     emitir(IRTGI(IR_UGT), trend, trlen);
+#if !LJ_51
+    /* Start behind end of the string? There will never be a match. */
+    J->base[0] = TREF_NIL;
+    return;
+#else
     end = (int32_t)str->len;
     trend = trlen;
+#endif
   }
   trstart = recff_string_start(J, str, &start, trstart, trlen, tr0);
   if (rd->data) {  /* Return string.sub result. */
@@ -1231,7 +1239,7 @@ static void LJ_FASTCALL recff_io_write(jit_State *J, RecordFFData *rd)
 	emitir(IRTGI(IR_EQ), tr, len);
     }
   }
-  J->base[0] = ud;
+  J->base[0] = LJ_51 ? TREF_TRUE : ud;
 }
 
 static void LJ_FASTCALL recff_io_flush(jit_State *J, RecordFFData *rd)

@@ -37,7 +37,7 @@
 
 static TValue *index2adr(lua_State *L, int idx)
 {
-#if !LJ_51
+#if LJ_ABIVER!=51
   if (idx == LUA_GLOBALSINDEX) {
     return (TValue*)lj_tab_getint(tabV(registry(L)), LUA_RIDX_GLOBALS);
   } else
@@ -49,7 +49,7 @@ static TValue *index2adr(lua_State *L, int idx)
     api_check(L, idx != 0 && -idx <= L->top - L->base);
     return L->top + idx;
   }
-#if LJ_51
+#if LJ_ABIVER==51
   else if (idx == LUA_GLOBALSINDEX) {
     TValue *o = &G(L)->tmptv;
     settabV(L, o, tabref(L->env));
@@ -198,7 +198,8 @@ LUA_API void lua_insert(lua_State *L, int idx)
 LUA_API void lua_replace(lua_State *L, int idx)
 {
   api_checknelems(L, 1);
-#if LJ_51
+#if LJ_ABIVER==51
+  /* XXX there are probably no 5.2 users of this */
   if (idx == LUA_GLOBALSINDEX) {
     api_check(L, tvistab(L->top-1));
     /* NOBARRIER: A thread (i.e. L) is never black. */
@@ -989,7 +990,7 @@ LUA_API void lua_getfenv(lua_State *L, int idx)
   incr_top(L);
 }
 
-LUA_API void lua_getuservalue(lua_State *L, int idx)
+LUA_API int lua_getuservalue(lua_State *L, int idx)
 {
   if (lua_isuserdata(L, idx)) {
     lua_getfenv(L, idx);
@@ -1003,6 +1004,7 @@ LUA_API void lua_getuservalue(lua_State *L, int idx)
       copyTV(L, L->top, s);
     incr_top(L);
   }
+  return ljx_tv2type(L, L->top-1);
 }
 
 LUA_API int lua_next(lua_State *L, int idx)
@@ -1130,7 +1132,7 @@ LUA_API void lua_seti(lua_State *L, int idx, lua_Integer i)
   }
 }
 
-#if !LJ_51
+#if LJ_ABIVER!=51
 LUA_API void lua_setglobal (lua_State *L, const char *var)
 {
   return lua_setfield(L, LUA_GLOBALSINDEX, var);
@@ -1502,6 +1504,13 @@ LUA_API int lua_resume(lua_State *L, int nargs)
   setstrV(L, L->top, lj_err_str(L, LJ_ERR_COSUSP));
   incr_top(L);
   return LUA_ERRRUN;
+}
+
+
+LUA_API void lua_setlevel(lua_State *from, lua_State *to)
+{
+  UNUSED(from);
+  UNUSED(to);
 }
 
 /* -- GC and memory management -------------------------------------------- */

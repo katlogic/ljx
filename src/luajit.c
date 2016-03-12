@@ -9,6 +9,7 @@
 ** Copyright (C) 1994-2008 Lua.org, PUC-Rio. See Copyright Notice in lua.h
 */
 
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -372,8 +373,9 @@ static void print_jit_status(lua_State *L)
 static void print_version(lua_State *L, int jit)
 {
 #ifndef LUAJIT_PRETEND_RIO
-  fputs(LJX_VERSION ", type _COPYRIGHTS, _CREDITS, _VERSION for more info.\n", stdout);
-  fputs("ABI: " LUA_VERSION_MAJOR "." LUA_VERSION_MINOR
+  fputs(LJX_VERSION
+      ", type _COPYRIGHTS, _CREDITS, _VERSION for more info.\n", stdout);
+  fputs(LUA_VERSION ", ABI: " LUA_ABIVER_STRING
         " on " LJ_OS_NAME "/" LJ_ARCH_NAME
 #if LJ_4GB
 	"/4GB heap"

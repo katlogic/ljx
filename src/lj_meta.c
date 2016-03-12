@@ -231,7 +231,10 @@ TValue *lj_meta_arith(lua_State *L, TValue *ra, cTValue *rb, cTValue *rc,
     setnumV(ra, lj_vm_foldarith(numV(b), numV(c), (int)mm-MM_add));
     return NULL;
   }
-metacall: {
+#if LJ_53
+metacall:
+#endif
+  {
     cTValue *mo = lj_meta_lookup(L, rb, mm);
     if (tvisnil(mo)) {
       mo = lj_meta_lookup(L, rc, mm);
@@ -322,13 +325,13 @@ TValue * LJ_FASTCALL lj_meta_len(lua_State *L, cTValue *o)
 {
   cTValue *mo = lj_meta_lookup(L, o, MM_len);
   if (tvisnil(mo)) {
-    if (tvistab(o))
+    if (!LJ_51 && tvistab(o))
       tabref(tabV(o)->metatable)->nomm |= (uint8_t)(1u<<MM_len);
     else
       lj_err_optype(L, o, LJ_ERR_OPLEN);
     return NULL;
   }
-  return mmcall(L, lj_cont_ra, mo, o, o);
+  return mmcall(L, lj_cont_ra, mo, o, LJ_51?niltv(L):o);
 }
 
 /* Helper for equality comparisons. __eq metamethod. */
@@ -395,17 +398,23 @@ TValue *lj_meta_comp(lua_State *L, cTValue *o1, cTValue *o2, int op)
     cTValue *mo = lj_meta_lookup(L, tviscdata(o1) ? o1 : o2, mm);
     if (LJ_UNLIKELY(tvisnil(mo))) goto err;
     return mmcall(L, cont, mo, o1, o2);
-  } else {
+  } else if ((!LJ_51) || itype(o1) == itype(o2)) {
     /* Never called with two numbers. */
     if (tvisstr(o1) && tvisstr(o2)) {
       int32_t res = lj_str_cmp(strV(o1), strV(o2));
       return (TValue *)(intptr_t)(((op&2) ? res <= 0 : res < 0) ^ (op&1));
     } else {
+trymt:;
       while (1) {
 	ASMFunction cont = (op & 1) ? lj_cont_condf : lj_cont_condt;
 	MMS mm = (op & 2) ? MM_le : MM_lt;
 	cTValue *mo = lj_meta_lookup(L, o1, mm);
+#if LJ_51
+        cTValue *mo2 = lj_meta_lookup(L, o2, mm);
+        if (tvisnil(mo) || !lj_obj_equal(mo, mo2))
+#else
 	if (tvisnil(mo) && tvisnil((mo = lj_meta_lookup(L, o2, mm))))
+#endif
 	{
 	  if (op & 2) {  /* MM_le not found: retry with MM_lt. */
 	    cTValue *ot = o1; o1 = o2; o2 = ot;  /* Swap operands. */
@@ -417,6 +426,9 @@ TValue *lj_meta_comp(lua_State *L, cTValue *o1, cTValue *o2, int op)
 	return mmcall(L, cont, mo, o1, o2);
       }
     }
+  } else if (tvisbool(o1) && tvisbool(o2)) {
+    goto trymt;
+  } else {
   err:
     lj_err_comp(L, o1, o2);
     return NULL;

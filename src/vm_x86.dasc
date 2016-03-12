@@ -3701,6 +3701,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  jnz <3
     |  jmp ->vmeta_len			// 'no __len' flag NOT set: check.
     break;
+#if LJ_53
   case BC_BNOT:
     |  ins_AD	// RA = dst, RD = src
     |  jmp ->vmeta_unm
@@ -3716,7 +3717,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  ins_ABC
     |  jmp ->vmeta_arith_vv
     break;
-
+#endif
     |.macro ins_arithpre, sseins, ssereg
     |  ins_ABC
     ||vk = ((int)op - BC_ADDVN) / (BC_ADDNV-BC_ADDVN);
