@@ -81,6 +81,8 @@
 #include "lj_gdbjit.c"
 #include "lj_alloc.c"
 
+#include "ljx_bitwise.c"
+
 #include "lib_aux.c"
 #include "lib_base.c"
 #include "lib_math.c"
@@ -94,4 +96,4 @@
 #include "lib_jit.c"
 #include "lib_ffi.c"
 #include "lib_init.c"
-
+#include "lib_utf8.c"

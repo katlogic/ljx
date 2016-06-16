@@ -55,7 +55,7 @@ LUALIB_API lua_Unsigned (luaL_checkunsigned) (lua_State *L, int numArg);
 LUALIB_API lua_Integer (luaL_optinteger) (lua_State *L, int nArg,
                                           lua_Integer def);
 LUALIB_API lua_Unsigned (luaL_optunsigned) (lua_State *L, int nArg,
-                                          lua_Integer def);
+                                          lua_Unsigned def);
 
 
 LUALIB_API void (luaL_checkstack) (lua_State *L, int sz, const char *msg);
