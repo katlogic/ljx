@@ -1163,7 +1163,7 @@ LUA_API void lua_rawsetp(lua_State *L, int idx, const void *p)
   api_checknelems(L, 1);
   setlightudV(&key, (void*)p);
   dst = lj_tab_set(L, t, &key);
-  copyTV(L, dst, L->top);
+  copyTV(L, dst, L->top-1);
   lj_gc_anybarriert(L, t);
   L->top--;
 }
