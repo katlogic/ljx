@@ -39,8 +39,10 @@
 #define LUA_LMULTILIB	"lib"
 #endif
 #define LUA_LROOT	"/usr/local"
-#if LUAJIT_ENABLE_LUA51COMPAT
+#if defined(LUAJIT_ENABLE_LUA51COMPAT)
 #define LUA_LUADIR	"/lua/5.1/"
+#elif defined(LUAJIT_ENABLE_LUA53COMPAT)
+#define LUA_LUADIR	"/lua/5.3/"
 #else
 #define LUA_LUADIR	"/lua/5.2/"
 #endif
@@ -72,7 +74,7 @@
 #endif
 
 /* Order of current directory depends on Lua version. */
-#if LUAJIT_ENABLE_LUA51COMPAT
+#if defined(LUAJIT_ENABLE_LUA51COMPAT)
 #define LUA_PATH_DEFAULT _LUA_PATH_CWD ";" _LUA_PATH_DEFAULT
 #define LUA_CPATH_DEFAULT _LUA_CPATH_CWD ";" _LUA_CPATH_DEFAULT
 #else

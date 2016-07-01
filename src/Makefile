@@ -17,8 +17,10 @@ VERSION:=$(shell git describe 2> /dev/null || cat ../.version)
 # and compile modules expecting 5.1-like header.
 #
 # See ENABLE_LUA5XCOMPAT to actually enforce particular version of the language.
-ABIVER=  5.1
-NODOTABIVER= 51
+# can be passed by parent makefile
+ABIVER ?= 5.2
+APIVER ?= $(ABIVER)
+NODOTABIVER:=$(subst .,,$(ABIVER))
 ################################################################################
 
 XCFLAGS= #This variable collects varios options below
@@ -35,13 +37,17 @@ XCFLAGS= #This variable collects varios options below
 # which can conflict with Lua 5.1 code. It will also report _VERSION as Lua 5.1.
 #
 # This will make LJX behave pretty much like stock LuaJIT.
-#XCFLAGS+= -DLUAJIT_ENABLE_LUA51COMPAT
+ifeq (5.1,$(APIVER))
+XCFLAGS+= -DLUAJIT_ENABLE_LUA51COMPAT
+endif
 ################################################################################
 
 ################################################################################
 # Enable Lua 5.3 features. Bitwise operators and some parts of standard
 # library. Will report _VERSION as 5.3
+ifeq (5.3,$(APIVER))
 XCFLAGS+= -DLUAJIT_ENABLE_LUA53COMPAT
+endif
 ################################################################################
 
 ################################################################################
@@ -269,7 +275,7 @@ TARGET_LIBPATH= $(or $(PREFIX),/usr/local)/$(or $(MULTILIB),lib)
 TARGET_SONAME= libluajit-ljx-$(ABIVER).so.$(VERSION)
 TARGET_DYLIBNAME= libluajit-ljx-$(ABIVER).$(VERSION).dylib
 TARGET_DYLIBPATH= $(TARGET_LIBPATH)/$(TARGET_DYLIBNAME)
-TARGET_DLLNAME= lua$(NODOTABIVER).dll
+TARGET_DLLNAME := lua$(NODOTABIVER).dll
 TARGET_XSHLDFLAGS= -shared -fPIC -Wl,-soname,$(TARGET_SONAME)
 TARGET_DYNXLDOPTS=
 

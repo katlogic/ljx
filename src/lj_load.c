@@ -62,7 +62,11 @@ LUA_API int lua_loadx(lua_State *L, lua_Reader reader, void *data,
 }
 
 LUA_API int lua_load(lua_State *L, lua_Reader reader, void *data,
-		     const char *chunkname)
+		     const char *chunkname
+#if !LJ_51
+		     , const char *mode
+#endif
+		     )
 {
   return lua_loadx(L, reader, data, chunkname, NULL);
 }

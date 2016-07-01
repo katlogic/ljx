@@ -327,14 +327,12 @@ LUA_API int   (lua_pcallk) (lua_State *L, int nargs, int nresults, int errfunc,
 LUA_API void  (lua_call) (lua_State *L, int nargs, int nresults);
 LUA_API int   (lua_pcall) (lua_State *L, int nargs, int nresults, int errfunc);
 LUA_API int   (lua_cpcall) (lua_State *L, lua_CFunction func, void *ud);
-#if LJ_ABIVER==51
-LUA_API int   (lua_load) (lua_State *L, lua_Reader reader, void *dt,
-                                        const char *chunkname);
-#else
-LUA_API int   (lua_load) (lua_State *L, lua_Reader reader, void *dt,
-                                        const char *chunkname, const char *mode);
+LUA_API int   (lua_load) (lua_State *L, lua_Reader reader, void *data,
+		     const char *chunkname
+#if LJ_ABIVER!=51
+		     , const char *mode
 #endif
-
+		     );
 LUA_API int (lua_dump) (lua_State *L, lua_Writer writer, void *data);
 
 

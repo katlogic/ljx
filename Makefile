@@ -13,8 +13,10 @@
 # Copyright (C) 2005-2015 Mike Pall. See Copyright Notice in luajit.h
 ##############################################################################
 
+ABIVER=5.3
+APIVER=5.3
+NODOTABIVER:=$(subst .,,$(ABIVER))
 VERSION= $(shell git describe 2> /dev/null || cat .version)
-ABIVER=  5.2
 
 ##############################################################################
 #
@@ -34,7 +36,7 @@ INSTALL_INC=   $(DPREFIX)/include/ljx-$(ABIVER)
 INSTALL_LJLIBD= $(INSTALL_SHARE)/luajit-$(VERSION)
 INSTALL_JITLIB= $(INSTALL_LJLIBD)/jit
 INSTALL_LMODD= $(INSTALL_SHARE)/lua
-INSTALL_LMOD= $(INSTALL_LMODD)/$(ABIVER)
+INSTALL_LMOD= $(INSTALL_LMODD)/$(APIVER)
 INSTALL_CMODD= $(INSTALL_LIB)/lua
 INSTALL_CMOD= $(INSTALL_CMODD)/$(ABIVER)
 INSTALL_MAN_DIR= $(INSTALL_SHARE)/man/man1
@@ -46,7 +48,7 @@ INSTALL_TSYMNAME= luajit
 INSTALL_ANAME= libluajit-ljx-$(ABIVER).a
 INSTALL_SONAME= libluajit-ljx-$(ABIVER).so.$(VERSION)
 INSTALL_SOSHORT1= libluajit-ljx-$(ABIVER).so
-INSTALL_SOSHORT2= libluajit-ljx-$(ABIVER).so.$(MAJVER)
+INSTALL_SOSHORT2= libluajit-ljx-$(ABIVER).so.$(VERSION)
 INSTALL_DYLIBNAME= libluajit-ljx-$(ABIVER).$(VERSION).dylib
 INSTALL_DYLIBSHORT1= libluajit-ljx-$(ABIVER).dylib
 INSTALL_DYLIBSHORT2= libluajit-ljx-$(ABIVER).LJX.dylib
@@ -75,6 +77,7 @@ UNINSTALL= $(RM)
 LDCONFIG= ldconfig -n
 SED_PC= sed -e "s|^prefix=.*|prefix=$(PREFIX)|" \
             -e "s|^multilib=.*|multilib=$(MULTILIB)|" \
+            -e "s|^abiver=.*|abiver=$(ABIVER)|" \
             -e "s|^version=.*|version=$(VERSION)|"
 
 FILE_T= luajit-ljx
@@ -95,10 +98,12 @@ ifeq (Darwin,$(shell uname -s))
   LDCONFIG= :
 endif
 ifneq (,$(findstring MSYS,$(shell uname -s)))
-  FILE_SO=lua52.dll
+  FILE_SO=lua$(NODOTABIVER).dll
   INSTALL_SONAME=$(FILE_SO) 
   INSTALL_TNAME= ljx.exe
   INSTALL_TSYMNAME= luajit.exe
+  INSTALL_SOSHORT1= libluajit-ljx-$(ABIVER).dll
+  INSTALL_SOSHORT2= libluajit-ljx-$(ABIVER).$(VERSION).dll
   FILE_T=luajit.exe
   LDCONFIG= :
 endif
@@ -109,8 +114,8 @@ INSTALL_DEP= src/luajit
 
 default all $(INSTALL_DEP):
 	@echo "==== Building LuaJIT/$(VERSION) ===="
-	$(MAKE) -C src
-	@echo "==== Successfully built LuaJIT/$(VERSION) ===="
+	$(MAKE) -C src ABIVER=$(ABIVER) APIVER=$(APIVER)
+	@echo "==== Successfully built LuaJIT/$(VERSION), ABI: $(ABIVER), API: $(APIVER) ===="
 
 install: $(INSTALL_DEP)
 	@echo "==== Installing LuaJIT/$(VERSION) to $(PREFIX) ===="
