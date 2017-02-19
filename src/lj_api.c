@@ -132,7 +132,7 @@ LUA_API int lua_absindex(lua_State *L, int idx)
 {
   if ((idx > 0) || (idx <= LUAI_FIRSTPSEUDOIDX))
     return idx;
-  return (int)(L->top - (L->base + idx - 1));
+  return (int)(L->top - (L->base + idx + 1));
 }
 
 static void reverse(lua_State *L, TValue *from, TValue *to)
