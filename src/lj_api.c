@@ -1404,6 +1404,10 @@ LUALIB_API void lua_len(lua_State *L, int i) {
   switch (lua_type(L, i)) {
     case LUA_TSTRING: /* fall through */
     case LUA_TTABLE:
+#if !LJ_51
+      if (luaL_callmeta(L, i, "__len"))
+        break;
+#endif
       lua_pushunsigned(L, lua_objlen(L, i));
       break;
     case LUA_TUSERDATA:
