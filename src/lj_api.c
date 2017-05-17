@@ -132,7 +132,7 @@ LUA_API int lua_absindex(lua_State *L, int idx)
 {
   if ((idx > 0) || (idx <= LUAI_FIRSTPSEUDOIDX))
     return idx;
-  return (int)(L->top - (L->base + idx - 1));
+  return (int)(L->top - (L->base + idx + 1));
 }
 
 static void reverse(lua_State *L, TValue *from, TValue *to)
@@ -967,11 +967,11 @@ LUALIB_API int luaL_getmetafield(lua_State *L, int idx, const char *field)
     cTValue *tv = lj_tab_getstr(tabV(L->top-1), lj_str_newz(L, field));
     if (tv && !tvisnil(tv)) {
       copyTV(L, L->top-1, tv);
-      return 1;
+      return ljx_tv2type(L, tv);
     }
     L->top--;
   }
-  return 0;
+  return LUA_TNIL;
 }
 
 LUA_API void lua_getfenv(lua_State *L, int idx)
@@ -1404,6 +1404,10 @@ LUALIB_API void lua_len(lua_State *L, int i) {
   switch (lua_type(L, i)) {
     case LUA_TSTRING: /* fall through */
     case LUA_TTABLE:
+#if !LJ_51
+      if (luaL_callmeta(L, i, "__len"))
+        break;
+#endif
       lua_pushunsigned(L, lua_objlen(L, i));
       break;
     case LUA_TUSERDATA:
